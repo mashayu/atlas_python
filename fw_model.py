@@ -1,10 +1,25 @@
-from helpers import printProgressBar, writevolbin
+from helpers import printProgressBar, writevolbin, find_region_centers, gen_bbox
 import trimesh
 from skimage import measure
 import numpy as np
 
 
 class Fw_model:
+
+    class Headvol:
+        def __init__(self):
+            self.volume = None
+            self.brain_vol = None
+            self.scalp_vol = None
+            self.center = None
+
+        def find_center(self):
+            volsurf = self.volume
+            bbox,_,_ = gen_bbox(volsurf)
+            print('bbox', bbox)
+            c = find_region_centers([bbox])
+            self.center = c[0]
+            return c[0]
 
     class Mesh:
         def __init__(self, mesh = None, reduced_mesh = None):
@@ -38,9 +53,10 @@ class Fw_model:
             self.reduced_faces = reduced_mesh.faces
 
     def __init__(self):
-        self.headvol = None
-        self.brain_vol = None
-        self.scalp_vol = None
+        self.headvol = self.Headvol()
+        #self.brain_vol = None
+        #self.scalp_vol = None
+        #self.headvol_center = None
 
 
         self.mesh_orig = self.Mesh()
@@ -54,29 +70,36 @@ class Fw_model:
 
         self.tiss_prop = [
                 {"absorption": [0.0191,0.0191], "scattering": [0.66,0.66], "anisotropy": [0.001], "refraction": [1.0]},
+                {"absorption": [0.0136,0.0136], "scattering": [0.86,0.86], "anisotropy": [0.001], "refraction": [1.0]},
                 {"absorption": [0.0026,0.0026], "scattering": [0.01,0.01], "anisotropy": [0.001], "refraction": [1.0]},
                 {"absorption": [0.0186,0.0186], "scattering": [1.1,1.1], "anisotropy": [0.001], "refraction": [1.0]},
                 {"absorption": [0.0186,0.0186], "scattering": [1.1,1.1], "anisotropy": [0.001], "refraction": [1.0]},
-                {"absorption": [0.0186,0.0186], "scattering": [1.1,1.1], "anisotropy": [0.001], "refraction": [1.0]},
+            ]
+        
+        self.tiss_prop2 = [
+                {"absorption": [0.0191], "scattering": [0.66], "anisotropy": [0.001], "refraction": [1.0]},
+                {"absorption": [0.0136], "scattering": [0.86], "anisotropy": [0.001], "refraction": [1.0]},
+                {"absorption": [0.0026], "scattering": [0.01], "anisotropy": [0.001], "refraction": [1.0]},
+                {"absorption": [0.0186], "scattering": [1.1], "anisotropy": [0.001], "refraction": [1.0]},
+                {"absorption": [0.0186], "scattering": [1.1], "anisotropy": [0.001], "refraction": [1.0]}
             ]
 
-
     def set_volume(self, brain_vol, scalp_vol):
-        self.brain_vol = brain_vol
-        self.scalp_vol = scalp_vol
+        self.headvol.brain_vol = brain_vol
+        self.headvol.scalp_vol = scalp_vol
 
     def set_volume2(self, volume_path, volume_file):
         #vol = nib.load(volume_file)
         #self.volume = vol.get_fdata()[:]
-        self.volume = volume_file
-        writevolbin(self.volume, volume_path)
+        self.headvol.volume = volume_file
+        writevolbin(self.headvol.volume, volume_path)
 
     
     def build_pial_surf(self, filename = 'bGM.nii'):
         isovalue = 0.9 #questionable parameter
         #img = nib.load(filename)
         #gm = img.get_fdata()[:]
-        vertices, faces, normals, values = measure.marching_cubes(self.brain_vol, isovalue)
+        vertices, faces, normals, values = measure.marching_cubes(self.headvol.brain_vol, isovalue)
         self.mesh_orig.vertices = vertices
         self.mesh_orig.faces = faces
         return vertices, faces
@@ -85,7 +108,7 @@ class Fw_model:
         isovalue = 0.9 #questionable parameter
         #img = nib.load(filename)
         #gm = img.get_fdata()[:]
-        vertices, faces, normals, values = measure.marching_cubes(self.scalp_vol, isovalue)
+        vertices, faces, normals, values = measure.marching_cubes(self.headvol.scalp_vol, isovalue)
         self.mesh_scalp_orig.vertices = vertices
         self.mesh_scalp_orig.faces = faces
         return vertices, faces
@@ -96,8 +119,8 @@ class Fw_model:
         elem  = self.mesh_orig.reduced_faces
         nNode = np.size(nodeX,0)
 
-        i_headvol = np.where(self.brain_vol != 0)
-        i_headvol_flat = np.ravel_multi_index(i_headvol, self.brain_vol.shape)
+        i_headvol = np.where(self.headvol.brain_vol != 0)
+        i_headvol_flat = np.ravel_multi_index(i_headvol, self.headvol.brain_vol.shape)
 
         nC = np.size(i_headvol_flat,0)
         Amap = np.zeros((nC, 1), dtype=np.int64)
@@ -158,12 +181,12 @@ class Fw_model:
         elem  = self.mesh_scalp_orig.reduced_faces 
         nNode = np.size(nodeX,0)
 
-        i_headvol = np.where(self.scalp_vol != 0)
-        i_headvol_flat = np.ravel_multi_index(i_headvol, self.scalp_vol.shape)
+        i_headvol = np.where(self.headvol.scalp_vol != 0)
+        i_headvol_flat = np.ravel_multi_index(i_headvol, self.headvol.scalp_vol.shape)
 
-        nx = self.scalp_vol.shape[0]
-        ny = self.scalp_vol.shape[1]
-        nz = self.scalp_vol.shape[2]
+        nx = self.headvol.scalp_vol.shape[0]
+        ny = self.headvol.scalp_vol.shape[1]
+        nz = self.headvol.scalp_vol.shape[2]
 
         nmiss = 0
         nxy = nx * ny

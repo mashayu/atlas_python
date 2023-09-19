@@ -1,5 +1,5 @@
-from temp_shared_globals import optpos, refpts, tiss_prop
-import pymcx as mcxm
+from temp_shared_globals import refpts
+import pymcx.pymcx as mcxm
 import numpy as np
 from fw_model import Fw_model
 from probe import Probe
@@ -7,7 +7,7 @@ import nibabel as nib
 
 
 def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
-    nopt = len(probe.optpos)
+    nopt = len(probe.reg_optpos)
     num_wavelengths = 2
     num_phot = 1000000
     #nNode = 19977
@@ -27,7 +27,7 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
     flueMesh_scalp = np.zeros((nNode_s, nopt, num_wavelengths))
 
     tiss_prop = fwmodel.tiss_prop
-    vol_shape = fwmodel.vol_shape
+    vol_shape = list(fwmodel.headvol.vol_t_shape)
 
 
     #hWait = None  # Initialize the waitbar (if applicable)
@@ -43,6 +43,9 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
             #cfg = {}
             cfg = mcxm.create()
             cfg["Domain"]['VolumeFile'] = volume_file
+
+            vol_shape = [193, 285, 225] 
+            print('vol_shape', vol_shape)
             cfg["Domain"]["Dim"] = vol_shape
         
 
@@ -50,8 +53,8 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
             #cfg["Forward"]['T1'] = time_gates[0][1]
             #cfg["Forward"]['Dt'] = time_gates[0][2]
 
-            cfg["Optode"]["Source"]["Pos"] = [probe.optpos[ii][0], probe.optpos[ii][1], probe.optpos[ii][2]]
-            srcdir = [probe.optpos[ii][3], probe.optpos[ii][4], probe.optpos[ii][5]]
+            cfg["Optode"]["Source"]["Pos"] = [probe.reg_optpos[ii][0], probe.reg_optpos[ii][1], probe.reg_optpos[ii][2]]
+            srcdir = [probe.reg_optpos[ii][3], probe.reg_optpos[ii][4], probe.reg_optpos[ii][5]]
             cfg["Optode"]["Source"]["Dir"] = list(srcdir / np.linalg.norm(srcdir))
             
             
@@ -62,8 +65,7 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
             cfg["Optode"]["Detector"] = {}
 
             cfg["Domain"]['OriginType'] = 1#cfg['issrcfrom0'] = 1
-            #cfg['isnormalized'] = 1
-            #cfg['outputtype'] = 'fluence'
+            #cfg['isnormalized'] = 1mn -d5-
             
             #mua -absorption, mus - scattering, g - anisotropy, n - refraction
             
@@ -76,25 +78,38 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
                 "g": tiss_prop[i]['anisotropy'][0],
                 "n": tiss_prop[i]['refraction'][0]
             } for i in range(len(tiss_prop))])
+
+            print("tiss prop", result_list)
             
             
             cfg["Domain"]["Media"] = result_list
-            cfg["Domain"]["MediaFormat"] = "byte"
+            cfg["Domain"]["MediaFormat"] = "integer"
            
             cfg["Session"]["RNGSeed"] = int(np.floor(np.random.rand() * 1e+7))#cfg['seed'] = int(np.floor(np.random.rand() * 1e+7))
             cfg["Session"]["Photons"] = num_phot#cfg['nphoton'] = num_phot
-            cfg["Session"]["OutputType"] = "fluence"
+            cfg["Session"]["DoNormalize"] = 1
+            cfg["Session"]["DoSaveVolume"] = 1
+            cfg["Session"]["OutputFormat"] = 'nii'#mc2
+            cfg["Session"]["DoPartialPath"] = 1
+            cfg["Session"]["DoDCS"] = 1
+            
+            cfg["Session"]["OutputType"] = 'F'#fluence
             #cfg['issaveexit'] = 1
             
             cfg["Shapes"] = []
+            del cfg["Optode"]["Source"]["Param1"]
+            del cfg["Optode"]["Source"]["Param2"]
             del cfg["Shapes"]
-            
-           
-            data = mcxm.run(cfg, "-F nii", mcxbin = r'C:\Program Files\MCXStudio\MCXSuite\mcx\bin\mcx.exe')
+
+            #output fluence file (.mc2), detected photon file (.mch)
+        
+            data = mcxm.run(cfg, "-d 1", mcxbin = r'C:\Program Files\MCXStudio\MCXSuite\mcx\bin\mcx.exe')
+            #"-F jnii"
 
             #newdata=jd.load(cfg["Session"]["ID"]+'.jnii')
             #print('newdata', newdata)
-            #print('data', data)
+            print('data', data)
+
             #flue = newdata['NIFTIData']
             #print(flue.shape)
             #flue_stat = data[0][1]
@@ -113,14 +128,14 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
 
             for jOpt in range(0, nopt):
                 foo = 0
-                xx, yy, zz = probe.optpos[jOpt][0], probe.optpos[jOpt][1], probe.optpos[jOpt][2]
+                xx, yy, zz = probe.reg_optpos[jOpt][0], probe.reg_optpos[jOpt][1], probe.reg_optpos[jOpt][2]
                 while foo == 0:
-                    print('xx', xx)
-                    print('yy', yy)
-                    print('zz', zz)
-                    xx += probe.optpos[jOpt][3]
-                    yy += probe.optpos[jOpt][4]
-                    zz += probe.optpos[jOpt][5]
+                    #print('xx', xx)
+                    #print('yy', yy)
+                    #print('zz', zz)
+                    xx += probe.reg_optpos[jOpt][3]
+                    yy += probe.reg_optpos[jOpt][4]
+                    zz += probe.reg_optpos[jOpt][5]
                     foo = flue[int(np.ceil(xx)), int(np.ceil(yy)), int(np.ceil(zz))]
 
                 flueDet[ii, jOpt, iWav] = foo
