@@ -2,32 +2,59 @@ import numpy as np
 from numpy.linalg import pinv
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import nibabel as nib
+import os
+import glob
 
 
-
-
-def plot_mesh(v,f):
-    # Display resulting triangular mesh using Matplotlib. This can also be done
-    # with mayavi (see skimage.measure.marching_cubes docstring).
+def plot_mesh(v, f, points=None):
     fig = plt.figure(figsize=(10, 10))
-    ax = fig.add_subplot(111, projection='3d')
-    # Fancy indexing: `verts[faces]` to generate a collection of triangles
+    ax = fig.add_subplot(111, projection="3d")
     mesh = Poly3DCollection(v[f])
-    #print(v[f[:20]])
-    mesh.set_facecolors('g')
-    mesh.set_edgecolor('k')
+    mesh.set_facecolors("g")
+    mesh.set_edgecolor("k")
     ax.add_collection3d(mesh)
-    ax.set_xlabel("x-axis: a = 6 per ellipsoid")
-    ax.set_ylabel("y-axis: b = 10")
-    ax.set_zlabel("z-axis: c = 16")
-    ax.set_xlim(0, 230)  # a = 6 (times two for 2nd ellipsoid)
-    ax.set_ylim(0, 300)  # b = 10
-    ax.set_zlim(0, 240)  # c = 16
+
+    # Plotting points if provided
+    if points is not None:
+        points = np.array(
+            points)  # converting to numpy array in case it's a list
+        ax.scatter(points[:, 0],
+                   points[:, 1],
+                   points[:, 2],
+                   c="r",
+                   marker="o",
+                   s=100)
+
+    # Compute the center of the data
+    center = v.mean(axis=0)
+
+    # Determine the maximum range of the data for each dimension
+    max_range = (v.max(axis=0) - v.min(axis=0)).max() / 2
+
+    # Adjust the axis limits
+    ax.set_xlim(center[0] - max_range, center[0] + max_range)
+    ax.set_ylim(center[1] - max_range, center[1] + max_range)
+    ax.set_zlim(center[2] - max_range, center[2] + max_range)
+
+    ax.set_xlabel("x-axis")
+    ax.set_ylabel("y-axis")
+    ax.set_zlabel("z-axis")
+
     plt.tight_layout()
     plt.show()
 
 
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
+def printProgressBar(
+    iteration,
+    total,
+    prefix="",
+    suffix="",
+    decimals=1,
+    length=100,
+    fill="█",
+    printEnd="\r",
+):
     """
     Call in a loop to create terminal progress bar
     @params:
@@ -40,17 +67,17 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
         fill        - Optional  : bar fill character (Str)
         printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
     """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    percent = ("{0:." + str(decimals) + "f}").format(
+        100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
-    bar = fill * filledLength + '-' * (length - filledLength)
-    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
+    bar = fill * filledLength + "-" * (length - filledLength)
+    print(f"\r{prefix} |{bar}| {percent}% {suffix}", end=printEnd)
     # Print New Line on Complete
-    if iteration == total: 
+    if iteration == total:
         print()
 
 
-
-def update_mask(volume, number:int):
+def update_mask(volume, number: int):
     ones_mask = volume == 1
     updated_mask = ones_mask * number
     new_volume = np.zeros_like(volume)
@@ -83,16 +110,19 @@ def gen_xform_from_pts(p1, p2):
         return None
 
     if p < n:
-        print(f"Cannot solve transformation with fewer anchor points ({p}) than dimensions ({n}).")
+        print(
+            f"Cannot solve transformation with fewer anchor points ({p}) than dimensions ({n})."
+        )
         return None
 
     A = np.hstack((p1, np.ones((p, 1))))
-   
+
     for ii in range(n):
         x = np.dot(pinv(A), p2[:, ii])
         T[ii, :] = x.T
-      
+
     return T
+
 
 def xform_apply(v, T):
     if v.size == 0:
@@ -101,7 +131,7 @@ def xform_apply(v, T):
     n = v.shape[0]
     v = v.T
 
-    print(T.shape)
+    #print(T.shape)
 
     if T.shape == (4, 4) or T.shape == (3, 4):
         A = T[:3, :3]
@@ -116,6 +146,7 @@ def xform_apply(v, T):
 
     return v1.T
 
+
 def gen_bbox2(volume):
     min_coords = np.array([np.inf, np.inf, np.inf])
     max_coords = np.array([-np.inf, -np.inf, -np.inf])
@@ -125,8 +156,11 @@ def gen_bbox2(volume):
         max_coords = np.maximum(max_coords, coord)
     return np.vstack((min_coords, max_coords))
 
-def xform_apply_vol_smooth(v1, T1, mode='slow'):
+
+def xform_apply_vol_smooth(v1, T1, mode="slow"):
     Dx_v1, Dy_v1, Dz_v1 = v1.shape
+
+    T_vert2vox = np.eye(4)
 
     # Get bounding boxes
     bbox_v1 = gen_bbox2(v1)
@@ -138,7 +172,7 @@ def xform_apply_vol_smooth(v1, T1, mode='slow'):
         [Dx_v1, 1, 1],
         [Dx_v1, 1, Dz_v1],
         [Dx_v1, Dy_v1, 1],
-        [Dx_v1, Dy_v1, Dz_v1]
+        [Dx_v1, Dy_v1, Dz_v1],
     ])
     bbox_v2 = np.round(np.dot(bbox_v1, T1[:3, :3].T) + T1[:3, 3])
     bbox_v2_grid0 = np.round(np.dot(bbox_v1_grid, T1[:3, :3].T) + T1[:3, 3])
@@ -147,23 +181,22 @@ def xform_apply_vol_smooth(v1, T1, mode='slow'):
     maxy, miny = np.max(bbox_v2[:, 1]), np.min(bbox_v2[:, 1])
     maxz, minz = np.max(bbox_v2[:, 2]), np.min(bbox_v2[:, 2])
 
-    if (
-        (maxx - minx) < Dx_v1 and minx > 1 and
+    if ((maxx - minx) < Dx_v1 and minx > 1 and
         (maxy - miny) < Dy_v1 and miny > 1 and
-        (maxz - minz) < Dz_v1 and minz > 1
-    ) or mode == 'gridsamesize':
+        (maxz - minz) < Dz_v1 and minz > 1) or mode == "gridsamesize":
         Dx_v2, Dy_v2, Dz_v2 = Dx_v1, Dy_v1, Dz_v1
     else:
-        tx, ty, tz = 1 - np.min(bbox_v2_grid0[:, 0]), 1 - np.min(bbox_v2_grid0[:, 1]), 1 - np.min(bbox_v2_grid0[:, 2])
-        T_vert2vox = np.array([
-            [1, 0, 0, tx],
-            [0, 1, 0, ty],
-            [0, 0, 1, tz],
-            [0, 0, 0, 1]
-        ])
-        if mode.lower() == 'fast':
+        tx, ty, tz = (
+            1 - np.min(bbox_v2_grid0[:, 0]),
+            1 - np.min(bbox_v2_grid0[:, 1]),
+            1 - np.min(bbox_v2_grid0[:, 2]),
+        )
+        T_vert2vox = np.array([[1, 0, 0, tx], [0, 1, 0, ty], [0, 0, 1, tz],
+                               [0, 0, 0, 1]])
+        if mode.lower() == "fast":
             return v2, T_vert2vox
-        bbox_v2_grid = np.dot(bbox_v2_grid0, T_vert2vox[:3, :3].T) + T_vert2vox[:3, 3]
+        bbox_v2_grid = np.dot(bbox_v2_grid0,
+                              T_vert2vox[:3, :3].T) + T_vert2vox[:3, 3]
         v2_gridsize = np.max(bbox_v2_grid, axis=0) - 1
         Dx_v2, Dy_v2, Dz_v2 = v2_gridsize.astype(int)
 
@@ -176,7 +209,6 @@ def xform_apply_vol_smooth(v1, T1, mode='slow'):
 
 
 def xform_apply_vol_smooth_64bit(v1, v2, T):
-
     if np.all(T == np.eye(4)):
         return v2
 
@@ -186,39 +218,41 @@ def xform_apply_vol_smooth_64bit(v1, v2, T):
     int_val = round((Dx_v2 * Dy_v2 * Dz_v2) / 50)
     N = Dx_v2 * Dy_v2 * Dz_v2
 
-    #TODO check indexing 
+    # TODO check indexing
     for kk in range(1, Dz_v2 + 1):
         for jj in range(1, Dy_v2 + 1):
             for ii in range(1, Dx_v2 + 1):
+                i = (np.dot(T[:, :3], np.array([ii, jj, kk])) +
+                     T[:, 3]).astype(int)
 
-                i = (np.dot(T[:, :3], np.array([ii, jj, kk])) + T[:, 3]).astype(int)
-
-                if (1 <= i[0] <= Dx_v1) and (1 <= i[1] <= Dy_v1) and (1 <= i[2] <= Dz_v1):
+                if ((1 <= i[0] <= Dx_v1) and (1 <= i[1] <= Dy_v1)
+                        and (1 <= i[2] <= Dz_v1)):
                     if v1[i[0] - 1, i[1] - 1, i[2] - 1] == 0:
                         continue
-                    v2[ii - 1, jj - 1, kk - 1] = v1[i[0] - 1, i[1] - 1, i[2] - 1]
+                    v2[ii - 1, jj - 1, kk - 1] = v1[i[0] - 1, i[1] - 1,
+                                                    i[2] - 1]
 
     return v2
 
 
+def writevolbin(vol, filename):
+    fname = filename + ".bin"
+    f = open(fname, "wb")
+    dmedium = np.ascontiguousarray(vol, int)
+    f.write(dmedium)
+    f.close()
 
-def writevolbin(vol,filename):
-	fname = filename+'.bin'
-	f = open(fname, 'wb')
-	dmedium = np.ascontiguousarray(vol,int)
-	f.write(dmedium)
-	f.close()
-        
 
-def writevolbin2(vol, filename, dtype=int):
-    fname = filename+'.bin'
+def writevolbin2(vol, filepath, dtype=int):
+    #fname = filename + ".bin"
+    fname = filepath
     print("file " + fname + " is written with shape " + str(vol.shape))
     with open(fname, "wb") as file:
         vol.astype(dtype).tofile(file)
 
 
 def find_region_centers(region_vertices):
-    print(region_vertices[0])
+    #print(region_vertices[0])
     n = len(region_vertices)
     region_centers = np.zeros((n, 3), dtype=int)
 
@@ -236,6 +270,7 @@ def find_region_centers(region_vertices):
 
     return region_centers
 
+
 def gen_bbox(obj, paddingsize=None):
     bbox_vert = []
     bbox_mp = []
@@ -245,7 +280,7 @@ def gen_bbox(obj, paddingsize=None):
         vol = obj
         i = np.where(vol != 0)
         x, y, z = i[0], i[1], i[2]
-        print('x', x.shape)
+        #print("x", x.shape)
         vert = []
     elif obj.ndim == 2:
         vert = obj
@@ -253,7 +288,8 @@ def gen_bbox(obj, paddingsize=None):
         vol = []
     elif obj.ndim == 1:
         x, y, x_delta, y_delta = obj[0], obj[1], obj[2], obj[3]
-        bbox_vert = np.array([[x, y], [x + x_delta, y], [x, y + y_delta], [x + x_delta, y + y_delta]])
+        bbox_vert = np.array([[x, y], [x + x_delta, y], [x, y + y_delta],
+                              [x + x_delta, y + y_delta]])
         bbox_vol = []
         return bbox_vert, bbox_mp, bbox_vol
 
@@ -261,7 +297,7 @@ def gen_bbox(obj, paddingsize=None):
         return bbox_vert, bbox_mp, bbox_vol
 
     maxx, maxy, maxz = np.max(x), np.max(y), np.max(z)
-    print('max', maxx, maxy, maxz)
+    #print("max", maxx, maxy, maxz)
     minx, miny, minz = np.min(x), np.min(y), np.min(z)
 
     if paddingsize is not None:
@@ -277,26 +313,110 @@ def gen_bbox(obj, paddingsize=None):
     maxz_p = maxz + padding_z
 
     bbox_vert = np.array([
-        [minx_p, miny_p, minz_p], [minx_p, miny_p, maxz_p], [minx_p, maxy_p, minz_p], [minx_p, maxy_p, maxz_p],
-        [maxx_p, miny_p, minz_p], [maxx_p, miny_p, maxz_p], [maxx_p, maxy_p, minz_p], [maxx_p, maxy_p, maxz_p]
+        [minx_p, miny_p, minz_p],
+        [minx_p, miny_p, maxz_p],
+        [minx_p, maxy_p, minz_p],
+        [minx_p, maxy_p, maxz_p],
+        [maxx_p, miny_p, minz_p],
+        [maxx_p, miny_p, maxz_p],
+        [maxx_p, maxy_p, minz_p],
+        [maxx_p, maxy_p, maxz_p],
     ])
 
     bbox_mp = np.array([
-        [minx_p, miny_p + (maxy_p - miny_p) / 2, minz_p + (maxz_p - minz_p) / 2],
-        [maxx_p, miny_p + (maxy_p - miny_p) / 2, minz_p + (maxz_p - minz_p) / 2],
-        [minx_p + (maxx_p - minx_p) / 2, miny_p, minz_p + (maxz_p - minz_p) / 2],
-        [minx_p + (maxx_p - minx_p) / 2, maxy_p, minz_p + (maxz_p - minz_p) / 2],
-        [minx_p + (maxx_p - minx_p) / 2, miny_p + (maxy_p - miny_p) / 2, minz_p],
-        [minx_p + (maxx_p - minx_p) / 2, miny_p + (maxy_p - miny_p) / 2, maxz_p]
+        [
+            minx_p, miny_p + (maxy_p - miny_p) / 2,
+            minz_p + (maxz_p - minz_p) / 2
+        ],
+        [
+            maxx_p, miny_p + (maxy_p - miny_p) / 2,
+            minz_p + (maxz_p - minz_p) / 2
+        ],
+        [
+            minx_p + (maxx_p - minx_p) / 2, miny_p,
+            minz_p + (maxz_p - minz_p) / 2
+        ],
+        [
+            minx_p + (maxx_p - minx_p) / 2, maxy_p,
+            minz_p + (maxz_p - minz_p) / 2
+        ],
+        [
+            minx_p + (maxx_p - minx_p) / 2, miny_p + (maxy_p - miny_p) / 2,
+            minz_p
+        ],
+        [
+            minx_p + (maxx_p - minx_p) / 2, miny_p + (maxy_p - miny_p) / 2,
+            maxz_p
+        ],
     ])
 
-    T = np.array([[1, 0, 0, -minx_p + 1], [0, 1, 0, -miny_p + 1], [0, 0, 1, -minz_p + 1], [0, 0, 0, 1]])
+    T = np.array([
+        [1, 0, 0, -minx_p + 1],
+        [0, 1, 0, -miny_p + 1],
+        [0, 0, 1, -minz_p + 1],
+        [0, 0, 0, 1],
+    ])
     bbox_vol = np.round(xform_apply(bbox_vert, T))
 
     if vol.size != 0:
         vol = np.zeros_like(vol, dtype=np.uint8)
-        vol[bbox_vol[0, 0]:bbox_vol[-1, 0] + 1, bbox_vol[0, 1]:bbox_vol[-1, 1] + 1, bbox_vol[0, 2]:bbox_vol[-1, 2] + 1] = 1
+        vol[bbox_vol[0, 0]:bbox_vol[-1, 0] + 1,
+            bbox_vol[0, 1]:bbox_vol[-1, 1] + 1,
+            bbox_vol[0, 2]:bbox_vol[-1, 2] + 1, ] = 1
 
-    print("bbox_vol", bbox_vol)
+    #print("bbox_vol", bbox_vol)
     return bbox_vert, bbox_mp, bbox_vol
 
+
+def plot_point_cloud(data):
+    data = np.array(data)
+    # Find coordinates of points where the value equals 1
+    indices = np.argwhere(data == 1)
+
+    indices = indices[::30]
+
+    # Extract the x, y, and z coordinates from the indices
+    x_coords = indices[:, 0]
+    y_coords = indices[:, 1]
+    z_coords = indices[:, 2]
+
+    # Create a 3D scatter plot for the point cloud
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+    ax.scatter(x_coords, y_coords, z_coords, c="b", marker="o")
+
+    # Set axis labels
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+
+    plt.show()
+
+
+def check_unique_values(vol_file, data_type):
+    with open(vol_file, "rb") as file:
+        array_1d = np.fromfile(file, dtype=data_type)
+    return np.unique(array_1d)
+
+
+def save_nifti(volume, filename):
+    # Create a NIfTI image object
+    nifti_img = nib.Nifti1Image(
+        volume, affine=None)  # The affine matrix can be provided if needed
+
+    # Specify the output filename (e.g., "output.nii.gz")
+    output_filename = filename + ".nii"
+
+    # Save the NIfTI image to a file
+    nib.save(nifti_img, output_filename)
+
+
+def find_nirs_file(probe_folder):
+    # Search for all .nirs files inside the given directory
+    nirs_files = glob.glob(os.path.join(probe_folder, '*.nirs'))
+
+    # Check if there's any .nirs file found
+    if nirs_files:
+        return nirs_files[0]  # returning the first .nirs file found
+    else:
+        return None  # return None if no .nirs file is found
