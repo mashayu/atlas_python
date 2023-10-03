@@ -289,8 +289,8 @@ class Fw_model:
                 ii += 1
             else:
                 nmiss += 1  # temporary var, delete when everything works
-                print("miss", nmiss)
-        print(nmiss)
+                
+        print("miss", nmiss)
         ciao = np.where(mapMesh2Vox == 0)
         mapMesh2Vox[ciao] = 1
         self.path_projVoltoMesh_brain = os.path.join(filepath, filename)
