@@ -131,8 +131,6 @@ def xform_apply(v, T):
     n = v.shape[0]
     v = v.T
 
-    #print(T.shape)
-
     if T.shape == (4, 4) or T.shape == (3, 4):
         A = T[:3, :3]
         b = T[:3, 3]
@@ -183,7 +181,7 @@ def xform_apply_vol_smooth(v1, T1, mode="slow"):
 
     if ((maxx - minx) < Dx_v1 and minx > 1 and
         (maxy - miny) < Dy_v1 and miny > 1 and
-        (maxz - minz) < Dz_v1 and minz > 1) or mode == "gridsamesize":
+            (maxz - minz) < Dz_v1 and minz > 1) or mode == "gridsamesize":
         Dx_v2, Dy_v2, Dz_v2 = Dx_v1, Dy_v1, Dz_v1
     else:
         tx, ty, tz = (
@@ -215,8 +213,8 @@ def xform_apply_vol_smooth_64bit(v1, v2, T):
     Dx_v1, Dy_v1, Dz_v1 = v1.shape
     Dx_v2, Dy_v2, Dz_v2 = v2.shape
 
-    int_val = round((Dx_v2 * Dy_v2 * Dz_v2) / 50)
-    N = Dx_v2 * Dy_v2 * Dz_v2
+    # int_val = round((Dx_v2 * Dy_v2 * Dz_v2) / 50)
+    # N = Dx_v2 * Dy_v2 * Dz_v2
 
     # TODO check indexing
     for kk in range(1, Dz_v2 + 1):
@@ -235,8 +233,8 @@ def xform_apply_vol_smooth_64bit(v1, v2, T):
     return v2
 
 
-def writevolbin(vol, filename):
-    fname = filename + ".bin"
+def writevolbin(vol, filepath):
+    fname = filepath
     f = open(fname, "wb")
     dmedium = np.ascontiguousarray(vol, int)
     f.write(dmedium)
@@ -244,7 +242,6 @@ def writevolbin(vol, filename):
 
 
 def writevolbin2(vol, filepath, dtype=int):
-    #fname = filename + ".bin"
     fname = filepath
     print("file " + fname + " is written with shape " + str(vol.shape))
     with open(fname, "wb") as file:
@@ -252,7 +249,7 @@ def writevolbin2(vol, filepath, dtype=int):
 
 
 def find_region_centers(region_vertices):
-    #print(region_vertices[0])
+    # print(region_vertices[0])
     n = len(region_vertices)
     region_centers = np.zeros((n, 3), dtype=int)
 
@@ -280,7 +277,7 @@ def gen_bbox(obj, paddingsize=None):
         vol = obj
         i = np.where(vol != 0)
         x, y, z = i[0], i[1], i[2]
-        #print("x", x.shape)
+        # print("x", x.shape)
         vert = []
     elif obj.ndim == 2:
         vert = obj
@@ -297,7 +294,7 @@ def gen_bbox(obj, paddingsize=None):
         return bbox_vert, bbox_mp, bbox_vol
 
     maxx, maxy, maxz = np.max(x), np.max(y), np.max(z)
-    #print("max", maxx, maxy, maxz)
+    # print("max", maxx, maxy, maxz)
     minx, miny, minz = np.min(x), np.min(y), np.min(z)
 
     if paddingsize is not None:
@@ -364,7 +361,7 @@ def gen_bbox(obj, paddingsize=None):
             bbox_vol[0, 1]:bbox_vol[-1, 1] + 1,
             bbox_vol[0, 2]:bbox_vol[-1, 2] + 1, ] = 1
 
-    #print("bbox_vol", bbox_vol)
+    # print("bbox_vol", bbox_vol)
     return bbox_vert, bbox_mp, bbox_vol
 
 

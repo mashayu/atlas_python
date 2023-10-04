@@ -34,7 +34,6 @@ class Fw_model:
             self.set_vertices(vertices)
 
         def reduce_mesh(self, num_of_faces=60000, filename=None):
-            print("filename", filename)
             reduced_mesh = trimesh.Trimesh(
                 self.vertices,
                 self.faces).simplify_quadratic_decimation(num_of_faces)
@@ -68,72 +67,73 @@ class Fw_model:
         self.path_projVoltoMesh_scalp = None
 
         self.vol_shape = None
+        self.tiss_prop = None
 
-        self.tiss_prop = [
-            {
-                "absorption": [0.0191, 0.0191],
-                "scattering": [0.66, 0.66],
-                "anisotropy": [0.001],
-                "refraction": [1.0],
-            },
-            {
-                "absorption": [0.0136, 0.0136],
-                "scattering": [0.86, 0.86],
-                "anisotropy": [0.001],
-                "refraction": [1.0],
-            },
-            {
-                "absorption": [0.0026, 0.0026],
-                "scattering": [0.01, 0.01],
-                "anisotropy": [0.001],
-                "refraction": [1.0],
-            },
-            {
-                "absorption": [0.0186, 0.0186],
-                "scattering": [1.1, 1.1],
-                "anisotropy": [0.001],
-                "refraction": [1.0],
-            },
-            {
-                "absorption": [0.0186, 0.0186],
-                "scattering": [1.1, 1.1],
-                "anisotropy": [0.001],
-                "refraction": [1.0],
-            },
-        ]
+        # self.tiss_prop = [
+        #     {
+        #         "absorption": [0.0191, 0.0191],
+        #         "scattering": [0.66, 0.66],
+        #         "anisotropy": [0.001],
+        #         "refraction": [1.0],
+        #     },
+        #     {
+        #         "absorption": [0.0136, 0.0136],
+        #         "scattering": [0.86, 0.86],
+        #         "anisotropy": [0.001],
+        #         "refraction": [1.0],
+        #     },
+        #     {
+        #         "absorption": [0.0026, 0.0026],
+        #         "scattering": [0.01, 0.01],
+        #         "anisotropy": [0.001],
+        #         "refraction": [1.0],
+        #     },
+        #     {
+        #         "absorption": [0.0186, 0.0186],
+        #         "scattering": [1.1, 1.1],
+        #         "anisotropy": [0.001],
+        #         "refraction": [1.0],
+        #     },
+        #     {
+        #         "absorption": [0.0186, 0.0186],
+        #         "scattering": [1.1, 1.1],
+        #         "anisotropy": [0.001],
+        #         "refraction": [1.0],
+        #     },
+        # ]
 
-        self.tiss_prop2 = [
-            {
-                "absorption": [0.0191],
-                "scattering": [0.66],
-                "anisotropy": [0.001],
-                "refraction": [1.0],
-            },
-            {
-                "absorption": [0.0136],
-                "scattering": [0.86],
-                "anisotropy": [0.001],
-                "refraction": [1.0],
-            },
-            {
-                "absorption": [0.0026],
-                "scattering": [0.01],
-                "anisotropy": [0.001],
-                "refraction": [1.0],
-            },
-            {
-                "absorption": [0.0186],
-                "scattering": [1.1],
-                "anisotropy": [0.001],
-                "refraction": [1.0],
-            },
-            {
-                "absorption": [0.0186],
-                "scattering": [1.1],
-                "anisotropy": [0.001],
-                "refraction": [1.0],
-            },
-        ]
+        # self.tiss_prop2 = [
+        #     {
+        #         "absorption": [0.0191],
+        #         "scattering": [0.66],
+        #         "anisotropy": [0.001],
+        #         "refraction": [1.0],
+        #     },
+        #     {
+        #         "absorption": [0.0136],
+        #         "scattering": [0.86],
+        #         "anisotropy": [0.001],
+        #         "refraction": [1.0],
+        #     },
+        #     {
+        #         "absorption": [0.0026],
+        #         "scattering": [0.01],
+        #         "anisotropy": [0.001],
+        #         "refraction": [1.0],
+        #     },
+        #     {
+        #         "absorption": [0.0186],
+        #         "scattering": [1.1],
+        #         "anisotropy": [0.001],
+        #         "refraction": [1.0],
+        #     },
+        #     {
+        #         "absorption": [0.0186],
+        #         "scattering": [1.1],
+        #         "anisotropy": [0.001],
+        #         "refraction": [1.0],
+        #     },
+        # ]
 
     def reset():
         pass
@@ -179,17 +179,17 @@ class Fw_model:
             updated_masks[mask_name] = updated_mask
             mask_values[mask_name] = mask_value
             mask_value += 1
-            #print(mask_name)
-            #print(np.unique(updated_mask[updated_mask != 0]))
+            # print(mask_name)
+            # print(np.unique(updated_mask[updated_mask != 0]))
 
         full_volume = np.zeros(updated_mask.shape, dtype=int)
         for updated_mask in updated_masks.values():
             full_volume += updated_mask
 
         self.headvol.set_brain_and_scalp_volumes(gm, skin)
-        atlas_viewer.binary_vol_t_path = os.path.join(atlas_viewer.working_dir,
-                                                      "myvolume.bin")
-        self.headvol.set_and_save_full_volume(atlas_viewer.binary_vol_t_path,
+        atlas_viewer.binary_vol_path = os.path.join(atlas_viewer.working_dir,
+                                                    "myvolume.bin")
+        self.headvol.set_and_save_full_volume(atlas_viewer.binary_vol_path,
                                               full_volume)
         self.headvol.vol_shape = full_volume.shape
 
@@ -208,6 +208,10 @@ class Fw_model:
     def projVoltoMesh_brain(self,
                             filepath,
                             filename="projVoltoMesh_brain.npy"):
+
+        if os.path.exists(os.path.join(filepath, filename)):
+            self.path_projVoltoMesh_brain = os.path.join(filepath, filename)
+            return
 
         if not hasattr(self.mesh_orig, 'reduced_vertices') or not hasattr(
                 self.mesh_orig,
@@ -254,7 +258,7 @@ class Fw_model:
                          prefix="projVoltoMesh_brain progress:",
                          suffix="Complete",
                          length=50)
-        #print("nC", nC)
+        # print("nC", nC)
         update_interval = int(np.ceil(nC / 100))
         for x, y, z in zip(x_coordinates, y_coordinates, z_coordinates):
             # print(f"Voxel at coordinates ({x}, {y}, {z}) is gray matter.")
@@ -277,7 +281,7 @@ class Fw_model:
                 # rsep: get the distances from [x y z] to all the points in nodeX(i_nX,:).
                 rsep = np.linalg.norm(nodeX[i_nX, :] - np.ones(
                     (len(i_nX), 1)) * [x, y, z],
-                                      axis=1)
+                    axis=1)
                 imin = np.argmin(rsep)
                 Amap[ii] = i_nX[imin]
                 NVoxPerNode[Amap[ii]] += 1  # might be useful?
@@ -289,11 +293,11 @@ class Fw_model:
                 ii += 1
             else:
                 nmiss += 1  # temporary var, delete when everything works
-                
-        print("miss", nmiss)
+
+        # print("miss", nmiss)
         ciao = np.where(mapMesh2Vox == 0)
         mapMesh2Vox[ciao] = 1
-        self.path_projVoltoMesh_brain = os.path.join(filepath, filename)
+
         np.save(self.path_projVoltoMesh_brain, mapMesh2Vox)
 
         return mapMesh2Vox, NVoxPerNode, Amap
@@ -301,6 +305,11 @@ class Fw_model:
     def projVoltoMesh_scalp(self,
                             filepath,
                             filename="projVoltoMesh_scalp.npy"):
+
+        if os.path.exists(os.path.join(filepath, filename)):
+            self.path_projVoltoMesh_scalp = os.path.join(filepath, filename)
+            return
+
         nodeX = self.mesh_scalp_orig.reduced_vertices
         elem = self.mesh_scalp_orig.reduced_faces
         nNode = np.size(nodeX, 0)
@@ -358,7 +367,7 @@ class Fw_model:
                 # rsep: get the distances from [x y z] to all the points in nodeX(i_nX,:).
                 rsep = np.linalg.norm(nodeX[i_nX, :] - np.ones(
                     (len(i_nX), 1)) * [x, y, z],
-                                      axis=1)
+                    axis=1)
                 imin = np.argmin(rsep)
                 Amap[ii] = i_nX[imin]
                 NVoxPerNode[Amap[ii]] += 1  # might be useful?

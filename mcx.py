@@ -6,7 +6,8 @@ from probe import Probe
 import nibabel as nib
 
 
-def calculate_fluence(fwmodel, probe, volume_file):
+def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
+
     # Null checks
     if not fwmodel:
         raise ValueError("fwmodel cannot be None.")
@@ -33,9 +34,11 @@ def calculate_fluence(fwmodel, probe, volume_file):
     nopt = len(probe.reg_optpos)
     num_wavelengths = 2
     num_phot = 1000000
+    # nNode = 19977
 
     nodeX = fwmodel.mesh_orig.reduced_vertices
     elem = fwmodel.mesh_orig.reduced_faces
+
     if nodeX is None or elem is None:
         raise ValueError("Missing required mesh data in fwmodel.mesh_orig")
 
@@ -48,7 +51,6 @@ def calculate_fluence(fwmodel, probe, volume_file):
             "Missing required mesh data in fwmodel.mesh_scalp_orig")
 
     nNode_s = np.size(nodeX_s, 0)
-
     flueMesh = np.zeros((nNode, nopt, num_wavelengths))
     flueDet = np.zeros((nopt, nopt, num_wavelengths))
     maxNVoxPerNode = fwmodel.get_projVolToMesh_brain().shape[1]
@@ -75,28 +77,22 @@ def calculate_fluence(fwmodel, probe, volume_file):
 
             # cfg = {}
             cfg = mcxm.create()
-            cfg["Domain"]["VolumeFile"] = volume_file
+            cfg["Domain"]['VolumeFile'] = volume_file
 
-            vol_shape = [193, 285, 225]
-            #print("vol_shape", vol_shape)
+            # vol_shape = [193, 285, 225]
+            print('vol_shape', vol_shape)
             cfg["Domain"]["Dim"] = vol_shape
 
             # cfg["Forward"]['T0'] = time_gates[0][0]
             # cfg["Forward"]['T1'] = time_gates[0][1]
             # cfg["Forward"]['Dt'] = time_gates[0][2]
 
-            cfg["Optode"]["Source"]["Pos"] = [
-                probe.reg_optpos[ii][0],
-                probe.reg_optpos[ii][1],
-                probe.reg_optpos[ii][2],
-            ]
-            srcdir = [
-                probe.reg_optpos[ii][3],
-                probe.reg_optpos[ii][4],
-                probe.reg_optpos[ii][5],
-            ]
-            cfg["Optode"]["Source"]["Dir"] = list(srcdir /
-                                                  np.linalg.norm(srcdir))
+            cfg["Optode"]["Source"]["Pos"] = [probe.reg_optpos[ii]
+                                              [0], probe.reg_optpos[ii][1], probe.reg_optpos[ii][2]]
+            srcdir = [probe.reg_optpos[ii][3],
+                      probe.reg_optpos[ii][4], probe.reg_optpos[ii][5]]
+            cfg["Optode"]["Source"]["Dir"] = list(
+                srcdir / np.linalg.norm(srcdir))
 
             # print(np.linalg.norm(srcdir))
             # print(list(srcdir / np.linalg.norm(srcdir)))
@@ -104,7 +100,7 @@ def calculate_fluence(fwmodel, probe, volume_file):
 
             cfg["Optode"]["Detector"] = {}
 
-            cfg["Domain"]["OriginType"] = 1  # cfg['issrcfrom0'] = 1
+            cfg["Domain"]['OriginType'] = 1  # cfg['issrcfrom0'] = 1
             # cfg['isnormalized'] = 1mn -d5-
 
             # mua -absorption, mus - scattering, g - anisotropy, n - refraction
@@ -112,28 +108,27 @@ def calculate_fluence(fwmodel, probe, volume_file):
             result_list = [{"mua": 0, "mus": 0, "g": 1, "n": 1}]
 
             result_list.extend([{
-                "mua": tiss_prop[i]["absorption"][iWav],
-                "mus": tiss_prop[i]["scattering"][iWav],
-                "g": tiss_prop[i]["anisotropy"][0],
-                "n": tiss_prop[i]["refraction"][0],
+                "mua": tiss_prop[i]['absorption'],  # [iWav],
+                "mus": tiss_prop[i]['scattering'],  # [iWav],
+                "g": tiss_prop[i]['anisotropy'],  # [0],
+                "n": tiss_prop[i]['refraction']  # [0]
             } for i in range(len(tiss_prop))])
 
-            #print("tiss prop", result_list)
+            print("tiss prop", result_list)
 
             cfg["Domain"]["Media"] = result_list
             cfg["Domain"]["MediaFormat"] = "integer"
 
-            cfg["Session"]["RNGSeed"] = int(np.floor(
-                np.random.rand() *
-                1e7))  # cfg['seed'] = int(np.floor(np.random.rand() * 1e+7))
+            # cfg['seed'] = int(np.floor(np.random.rand() * 1e+7))
+            cfg["Session"]["RNGSeed"] = int(np.floor(np.random.rand() * 1e+7))
             cfg["Session"]["Photons"] = num_phot  # cfg['nphoton'] = num_phot
             cfg["Session"]["DoNormalize"] = 1
             cfg["Session"]["DoSaveVolume"] = 1
-            cfg["Session"]["OutputFormat"] = "nii"  # mc2
+            cfg["Session"]["OutputFormat"] = 'nii'  # mc2
             cfg["Session"]["DoPartialPath"] = 1
             cfg["Session"]["DoDCS"] = 1
 
-            cfg["Session"]["OutputType"] = "F"  # fluence
+            cfg["Session"]["OutputType"] = 'F'  # fluence
             # cfg['issaveexit'] = 1
 
             cfg["Shapes"] = []
@@ -144,21 +139,17 @@ def calculate_fluence(fwmodel, probe, volume_file):
             # output fluence file (.mc2), detected photon file (.mch)
 
             data = mcxm.run(
-                cfg,
-                "-d 1",
-                mcxbin=
-                r"C:\Program Files\MCXStudio\MCXSuite\mcxcl\bin\mcxcl.exe",
-            )
+                cfg, "-d 1", mcxbin=r'C:\Program Files\MCXStudio\MCXSuite\mcx\bin\mcx.exe')
             # "-F jnii"
 
             # newdata=jd.load(cfg["Session"]["ID"]+'.jnii')
             # print('newdata', newdata)
-            print("data", data)
+            print('data', data)
 
             # flue = newdata['NIFTIData']
             # print(flue.shape)
             # flue_stat = data[0][1]
-            img = nib.load(cfg["Session"]["ID"] + ".nii")
+            img = nib.load(cfg["Session"]["ID"]+'.nii')
             flue = img.get_fdata()[:]
             print("nonzero check", np.any(flue[:, :, :, 0] != 0))
             print(flue.shape)
@@ -169,25 +160,20 @@ def calculate_fluence(fwmodel, probe, volume_file):
             # scale = flue['stat']['energyabs'] / np.sum(flue['data'][fwmodel['i_head']] * mua[fwmodel['i_head']]
 
             # TODO flue_stat['normalizer'] must be read from somewhere
-            flue = flue * cfg["Forward"]["Dt"] / 1  # flue_stat['normalizer']
+            flue = flue * cfg['Forward']['Dt'] / 1  # flue_stat['normalizer']
 
             for jOpt in range(0, nopt):
                 foo = 0
-                xx, yy, zz = (
-                    probe.reg_optpos[jOpt][0],
-                    probe.reg_optpos[jOpt][1],
-                    probe.reg_optpos[jOpt][2],
-                )
+                xx, yy, zz = probe.reg_optpos[jOpt][0], probe.reg_optpos[jOpt][1], probe.reg_optpos[jOpt][2]
                 while foo == 0:
-                    # print('xx', xx)
-                    # print('yy', yy)
-                    # print('zz', zz)
+                    print('xx', xx)
+                    print('yy', yy)
+                    print('zz', zz)
                     xx += probe.reg_optpos[jOpt][3]
                     yy += probe.reg_optpos[jOpt][4]
                     zz += probe.reg_optpos[jOpt][5]
-                    foo = flue[int(np.ceil(xx)),
-                               int(np.ceil(yy)),
-                               int(np.ceil(zz))]
+                    foo = flue[int(np.ceil(xx)), int(
+                        np.ceil(yy)), int(np.ceil(zz))]
 
                 flueDet[ii, jOpt, iWav] = foo
 
@@ -198,14 +184,12 @@ def calculate_fluence(fwmodel, probe, volume_file):
             # print(flue.data[mapMesh2Vox.astype(int)])
             # flueMesh[:, ii, iWav] = np.sum(np.reshape(flue.data[mapMesh2Vox.astype(int)], (nNode, maxNVoxPerNode)), axis=1)
 
-            mapMesh2Vox_flat = fwmodel.get_projVolToMesh_brain().flatten(
-            ).astype(int)
-            reshaped_data = np.reshape(flue.flatten()[mapMesh2Vox_flat],
-                                       (nNode, -1))
+            mapMesh2Vox_flat = fwmodel.get_projVolToMesh_brain().flatten().astype(int)
+            reshaped_data = np.reshape(
+                flue.flatten()[mapMesh2Vox_flat], (nNode, -1))
             flueMesh[:, ii, iWav] = np.sum(reshaped_data, axis=1)
 
-            mapMesh2Vox_scalp_flat = (
-                fwmodel.get_projVolToMesh_scalp().flatten().astype(int))
+            mapMesh2Vox_scalp_flat = fwmodel.get_projVolToMesh_scalp().flatten().astype(int)
             reshaped_data_scalp = np.reshape(
                 flue.flatten()[mapMesh2Vox_scalp_flat], (nNode_s, -1))
             flueMesh_scalp[:, ii, iWav] = np.sum(reshaped_data_scalp, axis=1)
@@ -223,38 +207,38 @@ def calculate_fluence(fwmodel, probe, volume_file):
 
             # Load data for BRAIN
             iS = int(probe.meas_list[iM, 0])
-            As = flueMesh[:, iS - 1, iWav]
+            As = flueMesh[:, iS-1, iWav]
 
             iD = int(probe.meas_list[iM, 1])
-            Ad = flueMesh[:, probe.nsrc + iD - 1, iWav]
+            Ad = flueMesh[:, probe.nsrc + iD-1, iWav]
 
-            normfactor = (flueDet[iS - 1, probe.nsrc + iD - 1, iWav] +
-                          flueDet[probe.nsrc + iD - 1, iS - 1, iWav]) / 2
+            normfactor = (flueDet[iS-1, probe.nsrc + iD-1, iWav] +
+                          flueDet[probe.nsrc + iD-1, iS-1, iWav]) / 2
 
             if normfactor != 0:
                 Adot[iM, :, iWav] = (As * Ad) / normfactor
             else:
-                print(f"No photons detected between Src {iS} and Det {iD}")
+                print(f'No photons detected between Src {iS} and Det {iD}')
                 Adot[iM, :, iWav] = np.zeros(As.shape)
 
             # Load data for SCALP
             iS = int(probe.meas_list[iM, 0])
-            As = flueMesh_scalp[:, iS - 1, iWav]
+            As = flueMesh_scalp[:, iS-1, iWav]
 
             iD = int(probe.meas_list[iM, 1])
-            Ad = flueMesh_scalp[:, probe.nsrc + iD - 1, iWav]
+            Ad = flueMesh_scalp[:, probe.nsrc + iD-1, iWav]
 
-            normfactor = (flueDet[iS - 1, probe.nsrc + iD - 1, iWav] +
-                          flueDet[probe.nsrc + iD - 1, iS - 1, iWav]) / 2
+            normfactor = (flueDet[iS-1, probe.nsrc + iD-1, iWav] +
+                          flueDet[probe.nsrc + iD-1, iS-1, iWav]) / 2
 
             if normfactor != 0:
                 Adot_scalp[iM, :, iWav] = (As * Ad) / normfactor
             else:
-                print(f"No photons detected between Src {iS} and Det {iD}")
+                print(f'No photons detected between Src {iS} and Det {iD}')
                 Adot_scalp[iM, :, iWav] = np.zeros(As.shape)
 
     fwmodel.Adot = Adot
     fwmodel.Adot_scalp = Adot_scalp
 
-    np.save("Adot.npy", Adot)
-    np.save("Adot_scalp.npy", Adot_scalp)
+    np.save('Adot.npy', Adot)
+    np.save('Adot_scalp.npy', Adot_scalp)

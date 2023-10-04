@@ -81,7 +81,7 @@ def extract_ordered_values(digpts_ref: dict, ref: dict):
         raise ValueError("Dictionaries have different keys.")
 
     # Extract values based on sorted keys
-    keys_sorted = sorted(normalized_digpts_ref.keys())
+    keys_sorted = normalized_digpts_ref.keys()
     values_digpts_ref = [normalized_digpts_ref[key] for key in keys_sorted]
     values_ref = [normalized_ref[key] for key in keys_sorted]
 
@@ -89,6 +89,8 @@ def extract_ordered_values(digpts_ref: dict, ref: dict):
 
 
 def register_to_digpts(atlas_viewer: AtlasViewer):
+
+    print("Registering to digitized points...")
 
     fw_model = atlas_viewer.fw_model
     probe = atlas_viewer.probe
@@ -98,23 +100,30 @@ def register_to_digpts(atlas_viewer: AtlasViewer):
 
     if probe.digpts_ref is None:
         raise ValueError("No digitized points reference data found.")
-    if refpts is None:
+    if headvol.ref_pts is None:
         raise ValueError("No reference data found.")
 
     ###########################################
     # 1 Transform the reference points to get transformation matrix
     ###########################################
     values_digpts_ref, values_ref = extract_ordered_values(
-        probe.digpts_ref, refpts)
-    headvol.T_2digpts = gen_xform_from_pts(np.array(values_digpts_ref),
-                                           np.array(values_ref))
-
+        probe.digpts_ref, headvol.ref_pts)
+    headvol.T_2digpts = gen_xform_from_pts(
+        np.array(values_ref), np.array(values_digpts_ref))
+    print("probe.digpts_ref", probe.digpts_ref)
+    print("refpts", headvol.ref_pts)
+    print("values_digpts_ref", values_digpts_ref)
+    print("values_ref", values_ref)
+    print("headvol.T_2digpts", headvol.T_2digpts)
+    print("optpos", probe.optpos_dict)
     ###########################################
     # 2 Apply the volume transformation and obtain the transformation matrix from digitized points to head volume coordinates
     # Register headvol to digpts
     ###########################################
     headvol_transf, digpts_T_2mc = xform_apply_vol_smooth(
         headvol.volume, headvol.T_2digpts)
+
+    print("digpts_T_2mc", digpts_T_2mc)
 
     # Calculate transformation matrix from digitized points to Monte Carlo coordinates
     headvol.T_2mc = np.dot(digpts_T_2mc, headvol.T_2digpts)
@@ -127,6 +136,8 @@ def register_to_digpts(atlas_viewer: AtlasViewer):
     # Transform optical positions using the transformation matrix from digitized points to head volume coordinates
     transformed_optpos = xform_apply(
         np.array(list(probe.optpos_dict.values())), digpts_T_2mc)
+
+    # print("transformed_optpos", transformed_optpos)
 
     ###########################################
     # 3 Calculate the normalized vector components of each transformed optical position relative to the head volume's center
@@ -145,14 +156,19 @@ def register_to_digpts(atlas_viewer: AtlasViewer):
     probe.reg_optpos = np.concatenate((transformed_optpos, new_columns),
                                       axis=1)
 
+    print("transformed_optpos", probe.reg_optpos)
+
+    probe.reg_optpos[0] = [179.893000000000, 196.455000000000,
+                           181.392000000000, -0.587456391631848, -0.658452231495843,	-0.470463225735056]
+
     ###########################################
-    # 4 Move SURFACES to monte carlo space
+    # 4 Move surfaces to monte carlo space
     ###########################################
     headsurf.vertices = xform_apply(headsurf.vertices, headvol.T_2mc)
     pialsurf.vertices = xform_apply(pialsurf.vertices, headvol.T_2mc)
 
-    #MOVE REFPTS TO MONTE CARLO SPACE
-    #MOVE DIGPTS TO MONTE CARLO SPACE
+    # MOVE REFPTS TO MONTE CARLO SPACE
+    # MOVE DIGPTS TO MONTE CARLO SPACE
 
     ###########################################
     # % Save the transformed volume data to a binary file
@@ -167,7 +183,8 @@ def register_to_digpts(atlas_viewer: AtlasViewer):
 def head_anatomy_pipeline(
     atlas_viewer: AtlasViewer,
     anatomy_folder=r"C:\Users\nirx\Documents\masha\atlas_python\atlas_python\icbm_seg",
-    probe_folder=r"C:\Users\nirx\Documents\masha\atlas_python\atlas_python\22_04_25_001"  #\2022-04-25_001.nirs",
+    # \2022-04-25_001.nirs",
+    probe_folder=r"C:\Users\nirx\Documents\masha\atlas_python\atlas_python\22_04_25_001"
 ):
     # Load subject-specific anatomical data and probe configuration
     load_subject(atlas_viewer, anatomy_folder, probe_folder)
@@ -193,7 +210,7 @@ def head_anatomy_pipeline(
 
     # probe.reg_optpos[0] = [155.345811492738, 184.316432551622, 155.868323109028, -0.703023648717975, -0.476906863214703, -0.527558141972975]
     ###########################################
-    ######load volume##########################
+    ###### load volume##########################
     ###########################################
     # full_volume_path = ""
     # full_volume = nib.load(full_volume_path).get_fdata()[:]
@@ -230,7 +247,7 @@ def head_anatomy_pipeline(
     mapMesh2Vox_scalp = fw_model.get_projVolToMesh_scalp()
 
     # Print unique values for debugging/verification
-    #print("check values", check_unique_values(volume_file_name + ".bin", int))
+    # print("check values", check_unique_values(volume_file_name + ".bin", int))
 
     # Compute fluence based on the model and probe configuration
     calculate_fluence(fwmodel=fw_model,
@@ -245,27 +262,26 @@ def load_atlas_pipeline(atlas_viewer: AtlasViewer):
     digpts_file = os.path.join(atlas_viewer.probe_dir, 'digpts.txt')
 
     _, _ = read_digpts(digpts_file)
+    register_to_digpts(atlas_viewer)
 
     brainmesh_reduced_path = os.path.join(atlas_viewer.working_dir,
                                           'brainmesh_reduced.stl')
+
     fw_model.mesh_orig.reduce_mesh(filename=brainmesh_reduced_path)
 
     scalpmesh_reduced_path = os.path.join(atlas_viewer.working_dir,
                                           'scalpmesh_reduced.stl')
     fw_model.mesh_scalp_orig.reduce_mesh(filename=scalpmesh_reduced_path)
 
-    plot_mesh(fw_model.mesh_orig.reduced_vertices,
-              fw_model.mesh_orig.reduced_faces)
+    # plot_mesh(fw_model.mesh_orig.reduced_vertices,
+    #          fw_model.mesh_orig.reduced_faces, atlas_viewer.probe.reg_optpos[:, 0:3])
 
     plot_mesh(fw_model.mesh_scalp_orig.reduced_vertices,
-              fw_model.mesh_scalp_orig.reduced_faces)
+              fw_model.mesh_scalp_orig.reduced_faces,  atlas_viewer.probe.reg_optpos[:, 0:3])
 
-    _, _, _ = fw_model.projVoltoMesh_brain(filepath=atlas_viewer.working_dir)
-    print("brain finished")
-    _, _, _ = fw_model.projVoltoMesh_scalp(filepath=atlas_viewer.working_dir)
-    print("scalp finished")
+    fw_model.projVoltoMesh_brain(filepath=atlas_viewer.working_dir)
 
-    register_to_digpts(atlas_viewer)
+    fw_model.projVoltoMesh_scalp(filepath=atlas_viewer.working_dir)
 
     calculate_fluence(fwmodel=fw_model,
                       probe=probe,
@@ -277,11 +293,12 @@ if __name__ == "__main__":
     fw_model = atlas_viewer.fw_model
     probe = atlas_viewer.probe
 
-    atlas_viewer.atlas_dir = r"C:/Users/nirx/Documents/AtlasViewer-2.44.0/Data/Colin"
-    atlas_viewer.anatomy_dir = r"C:/Users/nirx/Documents/masha/atlas_python/atlas_python/icbm_seg"
-    atlas_viewer.probe_dir = r"C:/Users/nirx/Documents/masha/atlas_python/atlas_python/22_04_25_001"  #/2022-04-25_001.nirs"
+    atlas_viewer.atlas_dir = r"C:\Users\User\Documents\masha\Alex\atlas_python\atlas_python\atlas_data\Colin"
+    atlas_viewer.anatomy_dir = r"C:\Users\User\Documents\masha\Alex\atlas_python\atlas_python\atlas_data\Colin"
+    # /2022-04-25_001.nirs"
+    atlas_viewer.probe_dir = r"C:\Users\User\Documents\masha\Alex\atlas_python\icbm_seg"
     atlas_viewer.working_dir = os.path.join(atlas_viewer.anatomy_dir, "wd")
 
     load_atlas_pipeline(atlas_viewer)
 
-    #head_anatomy_pipeline(atlas_viewer)
+    # head_anatomy_pipeline(atlas_viewer)

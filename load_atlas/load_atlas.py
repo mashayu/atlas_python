@@ -1,3 +1,11 @@
+import trimesh
+from skimage import measure
+from headvol import Headvol
+from fw_model import Fw_model
+from atlas import AtlasViewer
+from scipy.io import loadmat
+from .load_tiss_prop import get_tiss_prop
+from helpers import plot_mesh, plot_point_cloud
 import os
 import numpy as np
 
@@ -6,16 +14,6 @@ import json
 import sys
 
 sys.path.append("..")
-from helpers import plot_mesh, plot_point_cloud
-from .load_tiss_prop import get_tiss_prop
-from scipy.io import loadmat
-
-from atlas import AtlasViewer
-from fw_model import Fw_model
-from headvol import Headvol
-
-from skimage import measure
-import trimesh
 
 
 def load_mesh_data(file_path):
@@ -26,12 +24,12 @@ def load_mesh_data(file_path):
 
 
 def load_mesh_data_ttt(file_path):
-    #data = loadmat(file_path)["mesh"]
-    #print(data)
-    #vertices = data["vertices"]
-    #print()
-    #faces = [[item - 1 for item in sublist] for sublist in data["faces"]]
-    #return vertices, faces
+    # data = loadmat(file_path)["mesh"]
+    # print(data)
+    # vertices = data["vertices"]
+    # print()
+    # faces = [[item - 1 for item in sublist] for sublist in data["faces"]]
+    # return vertices, faces
 
     data = loadmat(file_path)
     print(data)
@@ -53,12 +51,12 @@ def load_mesh_data_ttt(file_path):
 
 
 def load_mesh_data_ttt2(file_path):
-    #data = loadmat(file_path)["mesh"]
-    #print(data)
-    #vertices = data["vertices"]
-    #print()
-    #faces = [[item - 1 for item in sublist] for sublist in data["faces"]]
-    #return vertices, faces
+    # data = loadmat(file_path)["mesh"]
+    # print(data)
+    # vertices = data["vertices"]
+    # print()
+    # faces = [[item - 1 for item in sublist] for sublist in data["faces"]]
+    # return vertices, faces
 
     data = loadmat(file_path)
     print(data)
@@ -81,12 +79,13 @@ def load_mesh_data_ttt2(file_path):
 
 
 def set_fw_model(fw_model, volume, volume_file_name, pialsurf_v, pialsurf_f,
-                 headsurf_v, headsurf_f, gm, scalp):
+                 headsurf_v, headsurf_f, gm, scalp, tiss_prop):
     fw_model.headvol.set_and_save_full_volume(volume_file_name, volume)
     fw_model.headvol.set_brain_and_scalp_volumes(gm, scalp)
     fw_model.mesh_orig.set_faces_and_vertices(pialsurf_f, pialsurf_v)
     fw_model.mesh_scalp_orig.set_faces_and_vertices(headsurf_f, headsurf_v)
     fw_model.headvol.find_center()
+    fw_model.tiss_prop = tiss_prop
 
 
 def compose_landmark_dict(landmarks, landmarks_labels):
@@ -142,15 +141,15 @@ def load_atlas(
         atlas_path="C:/Users/nirx/Documents/AtlasViewer-2.44.0/Data/Colin"):
     """
     Load atlas data and update the provided atlas_viewer instance.
-    
+
     Args:
     - atlas_viewer (AtlasViewer): An instance of the AtlasViewer class to be updated.
     - atlas_path (str): Path to the atlas data folder.
     """
 
     # Load the head volume
-    #headvol = Headvol(os.path.join(atlas_path, "anatomical", "headvol.vox"))
-    #atlas_viewer.headvol = headvol
+    # headvol = Headvol(os.path.join(atlas_path, "anatomical", "headvol.vox"))
+    # atlas_viewer.headvol = headvol
 
     # Ensure the working directory exists, if not, create it and change to it
     new_working_directory = atlas_viewer.working_dir
@@ -160,15 +159,15 @@ def load_atlas(
 
     # Load mesh data for pial and head surfaces
     pialsurf_v, pialsurf_f = load_mesh_data(
-        os.path.join(atlas_path, "myfolder", "pialmesh_data.mat"))
+        os.path.join(atlas_path, "pialmesh_data.mat"))
     headsurf_v, headsurf_f = load_mesh_data(
-        os.path.join(atlas_path, "myfolder", "headmesh_data.mat"))
+        os.path.join(atlas_path, "headmesh_data.mat"))
 
     # Load landmark data and its associated labels
-    landmarks = loadmat(os.path.join(atlas_path, "myfolder",
+    landmarks = loadmat(os.path.join(atlas_path,
                                      "landmarks.mat"))["landmark"]
     landmark_labels = loadmat(
-        os.path.join(atlas_path, "myfolder",
+        os.path.join(atlas_path,
                      "landmark_labels.mat"))["landmark_labels"][0]
 
     # Create a dictionary to associate landmarks with their labels
@@ -179,21 +178,19 @@ def load_atlas(
     print(landmark_dict)
 
     # Load volume data
-    vol2 = loadmat(os.path.join(atlas_path, "myfolder",
+    vol2 = loadmat(os.path.join(atlas_path,
                                 "headvol.mat"))["headvol_img"]
 
     # Define the binary volume path
-    atlas_viewer.binary_vol_t_path = os.path.join(atlas_viewer.working_dir,
-                                                  "myvolume.bin")
+    atlas_viewer.binary_vol_path = os.path.join(atlas_viewer.working_dir,
+                                                "myvolume.bin")
 
-    print(
-        "tiss_prop",
-        get_tiss_prop(
-            os.path.join(atlas_path, "myfolder", "headvol_tiss_type.txt")))
     tiss_prop = get_tiss_prop(
-        os.path.join(atlas_path, "myfolder", "headvol_tiss_type.txt"))
+        os.path.join(atlas_path,  "headvol_tiss_type.txt"))
 
-    ###For projecting to mesh
+    print(tiss_prop)
+
+    # For projecting to mesh
     tissue_indices = get_tissue_indices(tiss_prop)
     print("tissue", tissue_indices)
     gm = np.zeros_like(vol2)
@@ -205,37 +202,37 @@ def load_atlas(
     wm = np.zeros_like(vol2)
     wm[vol2 == tissue_indices["wm"]] = 1
 
-    #vertices, faces, _, _ = measure.marching_cubes(gm, 0.1)
-    #reduced_mesh = trimesh.Trimesh(
+    # vertices, faces, _, _ = measure.marching_cubes(gm, 0.1)
+    # reduced_mesh = trimesh.Trimesh(
     #    vertices, faces)  #.simplify_quadratic_decimation(100000)
-    #reduced_mesh.fill_holes()
-    #print(reduced_mesh.is_watertight)
-    #print(len(pialsurf_f))
-    #reduced_mesh.show()
+    # reduced_mesh.fill_holes()
+    # print(reduced_mesh.is_watertight)
+    # print(len(pialsurf_f))
+    # reduced_mesh.show()
 
-    #reduced_vertices = reduced_mesh.vertices
-    #reduced_faces = reduced_mesh.faces
+    # reduced_vertices = reduced_mesh.vertices
+    # reduced_faces = reduced_mesh.faces
 
     # Set up the forward model
-    set_fw_model(atlas_viewer.fw_model, vol2, atlas_viewer.binary_vol_t_path,
-                 pialsurf_v, pialsurf_f, headsurf_v, headsurf_f, gm, scalp)
+    set_fw_model(atlas_viewer.fw_model, vol2, atlas_viewer.binary_vol_path,
+                 pialsurf_v, pialsurf_f, headsurf_v, headsurf_f, gm, scalp, tiss_prop)
 
-    #plot_mesh(headsurf_v, headsurf_f)
-    #plot_mesh(pialsurf_v, pialsurf_f)
+    # plot_mesh(headsurf_v, headsurf_f)
+    # plot_mesh(pialsurf_v, pialsurf_f)
     # print(landmarks)
     # plot_point_cloud(headvol.img)
     plot_point_cloud(vol2)
 
-    #print("scalp")
-    #plot_point_cloud(scalp)
-    #print("csf")
-    #plot_point_cloud(csf)
-    #print("wm")
-    #plot_point_cloud(wm)
-    #print("gm")
-    #plot_point_cloud(gm)
+    # print("scalp")
+    # plot_point_cloud(scalp)
+    # print("csf")
+    # plot_point_cloud(csf)
+    # print("wm")
+    # plot_point_cloud(wm)
+    # print("gm")
+    # plot_point_cloud(gm)
 
-    #plot_mesh(reduced_vertices, reduced_faces)
+    # plot_mesh(reduced_vertices, reduced_faces)
 
     # print(pialsurf_f)
 
