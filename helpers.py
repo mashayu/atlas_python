@@ -233,18 +233,19 @@ def xform_apply_vol_smooth_64bit(v1, v2, T):
     return v2
 
 
-def writevolbin(vol, filepath):
-    fname = filepath
-    f = open(fname, "wb")
-    dmedium = np.ascontiguousarray(vol, int)
-    f.write(dmedium)
-    f.close()
+# def writevolbin(vol, filepath):
+#    fname = filepath
+#    f = open(fname, "wb")
+#    dmedium = np.ascontiguousarray(vol, int)
+#    f.write(dmedium)
+#    f.close()
 
 
 def writevolbin2(vol, filepath, dtype=int):
     fname = filepath
     print("file " + fname + " is written with shape " + str(vol.shape))
     with open(fname, "wb") as file:
+        vol = vol.ravel(order="F")
         vol.astype(dtype).tofile(file)
 
 
@@ -398,8 +399,8 @@ def check_unique_values(vol_file, data_type):
 
 def save_nifti(volume, filename):
     # Create a NIfTI image object
-    nifti_img = nib.Nifti1Image(
-        volume, affine=None)  # The affine matrix can be provided if needed
+    # The affine matrix can be provided if needed
+    nifti_img = nib.Nifti1Image(volume, affine=None)
 
     # Specify the output filename (e.g., "output.nii.gz")
     output_filename = filename + ".nii"

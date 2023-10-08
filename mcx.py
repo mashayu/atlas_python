@@ -100,7 +100,7 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
 
             cfg["Optode"]["Detector"] = {}
 
-            cfg["Domain"]['OriginType'] = 1  # cfg['issrcfrom0'] = 1
+            cfg["Domain"]['OriginType'] = 0  # cfg['issrcfrom0'] = 1
             # cfg['isnormalized'] = 1mn -d5-
 
             # mua -absorption, mus - scattering, g - anisotropy, n - refraction
@@ -114,7 +114,7 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
                 "n": tiss_prop[i]['refraction']  # [0]
             } for i in range(len(tiss_prop))])
 
-            print("tiss prop", result_list)
+            # print("tiss prop", result_list)
 
             cfg["Domain"]["Media"] = result_list
             cfg["Domain"]["MediaFormat"] = "integer"
@@ -139,7 +139,7 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
             # output fluence file (.mc2), detected photon file (.mch)
 
             data = mcxm.run(
-                cfg, "-d 1", mcxbin=r'C:\Program Files\MCXStudio\MCXSuite\mcx\bin\mcx.exe')
+                cfg, mcxbin=r'C:\Program Files\MCXStudio\MCXSuite\mcx\bin\mcx.exe')
             # "-F jnii"
 
             # newdata=jd.load(cfg["Session"]["ID"]+'.jnii')
@@ -166,9 +166,9 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
                 foo = 0
                 xx, yy, zz = probe.reg_optpos[jOpt][0], probe.reg_optpos[jOpt][1], probe.reg_optpos[jOpt][2]
                 while foo == 0:
-                    print('xx', xx)
-                    print('yy', yy)
-                    print('zz', zz)
+                    # print('xx', xx)
+                    # print('yy', yy)
+                    # print('zz', zz)
                     xx += probe.reg_optpos[jOpt][3]
                     yy += probe.reg_optpos[jOpt][4]
                     zz += probe.reg_optpos[jOpt][5]

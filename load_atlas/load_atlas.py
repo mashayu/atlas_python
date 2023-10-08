@@ -175,7 +175,7 @@ def load_atlas(
     atlas_viewer.headvol.ref_pts = landmark_dict
 
     # Print the landmark dictionary for debugging purposes
-    print(landmark_dict)
+    # print(landmark_dict)
 
     # Load volume data
     vol2 = loadmat(os.path.join(atlas_path,
@@ -188,11 +188,11 @@ def load_atlas(
     tiss_prop = get_tiss_prop(
         os.path.join(atlas_path,  "headvol_tiss_type.txt"))
 
-    print(tiss_prop)
+    # print(tiss_prop)
 
     # For projecting to mesh
     tissue_indices = get_tissue_indices(tiss_prop)
-    print("tissue", tissue_indices)
+    # print("tissue", tissue_indices)
     gm = np.zeros_like(vol2)
     gm[vol2 == tissue_indices["gm"]] = 1
     scalp = np.zeros_like(vol2)
@@ -221,7 +221,7 @@ def load_atlas(
     # plot_mesh(pialsurf_v, pialsurf_f)
     # print(landmarks)
     # plot_point_cloud(headvol.img)
-    plot_point_cloud(vol2)
+    # plot_point_cloud(vol2)
 
     # print("scalp")
     # plot_point_cloud(scalp)

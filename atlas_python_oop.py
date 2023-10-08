@@ -91,6 +91,7 @@ def extract_ordered_values(digpts_ref: dict, ref: dict):
 def register_to_digpts(atlas_viewer: AtlasViewer):
 
     print("Registering to digitized points...")
+    print("It will take a while...")
 
     fw_model = atlas_viewer.fw_model
     probe = atlas_viewer.probe
@@ -110,12 +111,6 @@ def register_to_digpts(atlas_viewer: AtlasViewer):
         probe.digpts_ref, headvol.ref_pts)
     headvol.T_2digpts = gen_xform_from_pts(
         np.array(values_ref), np.array(values_digpts_ref))
-    print("probe.digpts_ref", probe.digpts_ref)
-    print("refpts", headvol.ref_pts)
-    print("values_digpts_ref", values_digpts_ref)
-    print("values_ref", values_ref)
-    print("headvol.T_2digpts", headvol.T_2digpts)
-    print("optpos", probe.optpos_dict)
     ###########################################
     # 2 Apply the volume transformation and obtain the transformation matrix from digitized points to head volume coordinates
     # Register headvol to digpts
@@ -123,7 +118,8 @@ def register_to_digpts(atlas_viewer: AtlasViewer):
     headvol_transf, digpts_T_2mc = xform_apply_vol_smooth(
         headvol.volume, headvol.T_2digpts)
 
-    print("digpts_T_2mc", digpts_T_2mc)
+    save_nifti(headvol_transf, os.path.join(
+        atlas_viewer.working_dir, "volume_t"))
 
     # Calculate transformation matrix from digitized points to Monte Carlo coordinates
     headvol.T_2mc = np.dot(digpts_T_2mc, headvol.T_2digpts)
@@ -156,10 +152,8 @@ def register_to_digpts(atlas_viewer: AtlasViewer):
     probe.reg_optpos = np.concatenate((transformed_optpos, new_columns),
                                       axis=1)
 
-    print("transformed_optpos", probe.reg_optpos)
-
-    probe.reg_optpos[0] = [179.893000000000, 196.455000000000,
-                           181.392000000000, -0.587456391631848, -0.658452231495843,	-0.470463225735056]
+    # probe.reg_optpos[0] = [220, 220,
+    #                       220, -0.587456391631848, -0.658452231495843,	-0.470463225735056]
 
     ###########################################
     # 4 Move surfaces to monte carlo space
@@ -167,8 +161,8 @@ def register_to_digpts(atlas_viewer: AtlasViewer):
     headsurf.vertices = xform_apply(headsurf.vertices, headvol.T_2mc)
     pialsurf.vertices = xform_apply(pialsurf.vertices, headvol.T_2mc)
 
-    # MOVE REFPTS TO MONTE CARLO SPACE
-    # MOVE DIGPTS TO MONTE CARLO SPACE
+    # TODO MOVE REFPTS TO MONTE CARLO SPACE
+    # TODO MOVE DIGPTS TO MONTE CARLO SPACE
 
     ###########################################
     # % Save the transformed volume data to a binary file
@@ -276,8 +270,8 @@ def load_atlas_pipeline(atlas_viewer: AtlasViewer):
     # plot_mesh(fw_model.mesh_orig.reduced_vertices,
     #          fw_model.mesh_orig.reduced_faces, atlas_viewer.probe.reg_optpos[:, 0:3])
 
-    plot_mesh(fw_model.mesh_scalp_orig.reduced_vertices,
-              fw_model.mesh_scalp_orig.reduced_faces,  atlas_viewer.probe.reg_optpos[:, 0:3])
+    # plot_mesh(fw_model.mesh_scalp_orig.reduced_vertices,
+    #          fw_model.mesh_scalp_orig.reduced_faces,  atlas_viewer.probe.reg_optpos[:, 0:3])
 
     fw_model.projVoltoMesh_brain(filepath=atlas_viewer.working_dir)
 

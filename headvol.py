@@ -45,7 +45,7 @@ class Headvol:
         filename_img_tiss = filename[:i] + "_tiss_type.txt"
         if os.path.exists(filename_img_tiss):
             self.tiss_prop = get_tiss_prop(filename_img_tiss)
-        #print(self.tiss_prop)
+        # print(self.tiss_prop)
 
         filename_2digpts = filename[:i] + "2digpts.txt"
         if os.path.exists(filename_2digpts):
@@ -92,4 +92,4 @@ class Headvol:
         :param volume_data: Numpy array representing the full volume data
         """
         self.volume = volume_data
-        writevolbin(self.volume, volume_path)
+        writevolbin2(self.volume, volume_path)

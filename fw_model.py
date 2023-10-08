@@ -1,4 +1,4 @@
-from helpers import printProgressBar, writevolbin, find_region_centers, gen_bbox
+from helpers import printProgressBar, find_region_centers, gen_bbox
 import trimesh
 from skimage import measure
 import numpy as np
