@@ -1,12 +1,19 @@
 from temp_shared_globals import refpts
-import pymcx.pymcx as mcxm
+#import pymcx.pymcx as mcxm
 import numpy as np
+from atlas import AtlasViewer
 from fw_model import Fw_model
 from probe import Probe
-import nibabel as nib
+import os
+#import nibabel as nib
+
+import pmcx
 
 
 def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
+
+
+    atlas_viewer = AtlasViewer()
 
     # Null checks
     if not fwmodel:
@@ -69,98 +76,47 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
     for iWav in range(0, num_wavelengths):
         # Loop over number of optodes
         for ii in range(0, nopt):
-            # if hWait is not None:
-            #    waitbar_val = ((iWav - 1) * nopt + ii) / (num_wavelengths * nopt)
-            #    waitbar_msg = f'Running MCXlab for optode {((iWav - 1) * nopt + ii)} of {(num_wavelengths * nopt)}'
-            #    # Update the waitbar with the current progress
-            #    update_waitbar(hWait, waitbar_val, waitbar_msg)
-
-            # cfg = {}
-            cfg = mcxm.create()
-            cfg["Domain"]['VolumeFile'] = volume_file
-
-            # vol_shape = [193, 285, 225]
-            print('vol_shape', vol_shape)
-            cfg["Domain"]["Dim"] = vol_shape
-
-            # cfg["Forward"]['T0'] = time_gates[0][0]
-            # cfg["Forward"]['T1'] = time_gates[0][1]
-            # cfg["Forward"]['Dt'] = time_gates[0][2]
-
-            cfg["Optode"]["Source"]["Pos"] = [probe.reg_optpos[ii]
-                                              [0], probe.reg_optpos[ii][1], probe.reg_optpos[ii][2]]
             srcdir = [probe.reg_optpos[ii][3],
                       probe.reg_optpos[ii][4], probe.reg_optpos[ii][5]]
-            cfg["Optode"]["Source"]["Dir"] = list(
-                srcdir / np.linalg.norm(srcdir))
-
-            # print(np.linalg.norm(srcdir))
-            # print(list(srcdir / np.linalg.norm(srcdir)))
-            # print(srcdir)
-
-            cfg["Optode"]["Detector"] = {}
-
-            cfg["Domain"]['OriginType'] = 0  # cfg['issrcfrom0'] = 1
-            # cfg['isnormalized'] = 1mn -d5-
 
             # mua -absorption, mus - scattering, g - anisotropy, n - refraction
+            result_list = [[0, 0, 1, 1]]
+            result_list.extend([[                
+                tiss_prop[i]['absorption'],  # [iWav],
+                tiss_prop[i]['scattering'],  # [iWav],
+                tiss_prop[i]['anisotropy'],  # [0],
+                tiss_prop[i]['refraction']  # [0]
+            ] for i in range(len(tiss_prop))])
 
-            result_list = [{"mua": 0, "mus": 0, "g": 1, "n": 1}]
-
-            result_list.extend([{
-                "mua": tiss_prop[i]['absorption'],  # [iWav],
-                "mus": tiss_prop[i]['scattering'],  # [iWav],
-                "g": tiss_prop[i]['anisotropy'],  # [0],
-                "n": tiss_prop[i]['refraction']  # [0]
-            } for i in range(len(tiss_prop))])
-
-            # print("tiss prop", result_list)
-
-            cfg["Domain"]["Media"] = result_list
-            cfg["Domain"]["MediaFormat"] = "integer"
-
-            # cfg['seed'] = int(np.floor(np.random.rand() * 1e+7))
-            cfg["Session"]["RNGSeed"] = int(np.floor(np.random.rand() * 1e+7))
-            cfg["Session"]["Photons"] = num_phot  # cfg['nphoton'] = num_phot
-            cfg["Session"]["DoNormalize"] = 1
-            cfg["Session"]["DoSaveVolume"] = 1
-            cfg["Session"]["OutputFormat"] = 'nii'  # mc2
-            cfg["Session"]["DoPartialPath"] = 1
-            cfg["Session"]["DoDCS"] = 1
-
-            cfg["Session"]["OutputType"] = 'F'  # fluence
-            # cfg['issaveexit'] = 1
-
-            cfg["Shapes"] = []
-            del cfg["Optode"]["Source"]["Param1"]
-            del cfg["Optode"]["Source"]["Param2"]
-            del cfg["Shapes"]
-
-            # output fluence file (.mc2), detected photon file (.mch)
-
-            data = mcxm.run(
-                cfg, mcxbin=r'C:\Program Files\MCXStudio\MCXSuite\mcx\bin\mcx.exe')
-            # "-F jnii"
-
-            # newdata=jd.load(cfg["Session"]["ID"]+'.jnii')
-            # print('newdata', newdata)
-            print('data', data)
-
-            # flue = newdata['NIFTIData']
-            # print(flue.shape)
-            # flue_stat = data[0][1]
-            img = nib.load(cfg["Session"]["ID"]+'.nii')
-            flue = img.get_fdata()[:]
+            cfg = {
+                'nphoton': num_phot,
+                'vol': fwmodel.headvol.volume_t,
+                'tstart':0,
+                'tend':5e-9,
+                'tstep':5e-9,
+                'srcpos': [probe.reg_optpos[ii]
+                                              [0], probe.reg_optpos[ii][1], probe.reg_optpos[ii][2]],
+                'srcdir':list(
+                srcdir / np.linalg.norm(srcdir)),
+                'prop':result_list,
+                'issrcfrom0':1,
+                'isnormalized':1,
+                'outputtype':'fluence',
+                'seed':int(np.floor(np.random.rand() * 1e+7)),
+                'issaveexit':1,
+                }
+            data=pmcx.run(cfg)
+            
+            flue = data["flux"]
+            flue_stat = data["stat"]
             print("nonzero check", np.any(flue[:, :, :, 0] != 0))
             print(flue.shape)
-            # print(data)
-            # flue, detps = mcxlab(cfg)
 
             # Scale the fluence
             # scale = flue['stat']['energyabs'] / np.sum(flue['data'][fwmodel['i_head']] * mua[fwmodel['i_head']]
 
             # TODO flue_stat['normalizer'] must be read from somewhere
-            flue = flue * cfg['Forward']['Dt'] / 1  # flue_stat['normalizer']
+            flue = flue * cfg['tstep'] / 1  # flue_stat['normalizer']
 
             for jOpt in range(0, nopt):
                 foo = 0
@@ -240,5 +196,5 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
     fwmodel.Adot = Adot
     fwmodel.Adot_scalp = Adot_scalp
 
-    np.save('Adot.npy', Adot)
-    np.save('Adot_scalp.npy', Adot_scalp)
+    np.save(os.path.join(atlas_viewer.working_dir, "Adot.npy"), Adot)
+    np.save(os.path.join(atlas_viewer.working_dir, "Adot_scalp.npy"), Adot_scalp)
