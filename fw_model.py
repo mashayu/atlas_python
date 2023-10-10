@@ -233,6 +233,8 @@ class Fw_model:
 
         nC = np.size(i_headvol_flat, 0)
         Amap = np.zeros((nC, 1), dtype=np.int64)
+
+        # TODO: check if this is the right size(6000)
         mapMesh2Vox = np.ones((nNode, 6000), dtype=np.int64)
         NVoxPerNode = np.zeros((nNode, 1), dtype=np.int64)
 
@@ -322,6 +324,8 @@ class Fw_model:
         nC = np.size(i_headvol_flat, 0)
 
         Amap = np.zeros((nC, 1), dtype=np.int64)
+
+        # TODO: check if this is the right size(6000)
         mapMesh2Vox = np.ones((nNode, 6000), dtype=np.int64)
         NVoxPerNode = np.zeros((nNode, 1), dtype=np.int64)
 
