@@ -1,4 +1,4 @@
-from temp_shared_globals import refpts
+
 import scipy.io
 
 

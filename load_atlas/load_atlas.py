@@ -138,7 +138,7 @@ def get_tissue_indices(tiss_prop_list: list):
 
 def load_atlas(
         atlas_viewer: AtlasViewer,
-        atlas_path="C:/Users/nirx/Documents/AtlasViewer-2.44.0/Data/Colin"):
+        atlas_path):
     """
     Load atlas data and update the provided atlas_viewer instance.
 
@@ -155,7 +155,7 @@ def load_atlas(
     new_working_directory = atlas_viewer.working_dir
     if not os.path.exists(new_working_directory):
         os.makedirs(new_working_directory)
-    os.chdir(new_working_directory)
+    # os.chdir(new_working_directory)
 
     # Load mesh data for pial and head surfaces
     pialsurf_v, pialsurf_f = load_mesh_data(
@@ -178,8 +178,8 @@ def load_atlas(
     # print(landmark_dict)
 
     # Load volume data
-    vol2 = loadmat(os.path.join(atlas_path,
-                                "headvol.mat"))["headvol_img"]
+    volume = loadmat(os.path.join(atlas_path,
+                                  "headvol.mat"))["headvol_img"]
 
     # Define the binary volume path
     atlas_viewer.binary_vol_path = os.path.join(atlas_viewer.working_dir,
@@ -193,14 +193,14 @@ def load_atlas(
     # For projecting to mesh
     tissue_indices = get_tissue_indices(tiss_prop)
     # print("tissue", tissue_indices)
-    gm = np.zeros_like(vol2)
-    gm[vol2 == tissue_indices["gm"]] = 1
-    scalp = np.zeros_like(vol2)
-    scalp[vol2 == tissue_indices["scalp"]] = 1
-    csf = np.zeros_like(vol2)
-    csf[vol2 == tissue_indices["csf"]] = 1
-    wm = np.zeros_like(vol2)
-    wm[vol2 == tissue_indices["wm"]] = 1
+    gm = np.zeros_like(volume)
+    gm[volume == tissue_indices["gm"]] = 1
+    scalp = np.zeros_like(volume)
+    scalp[volume == tissue_indices["scalp"]] = 1
+    csf = np.zeros_like(volume)
+    csf[volume == tissue_indices["csf"]] = 1
+    wm = np.zeros_like(volume)
+    wm[volume == tissue_indices["wm"]] = 1
 
     # vertices, faces, _, _ = measure.marching_cubes(gm, 0.1)
     # reduced_mesh = trimesh.Trimesh(
@@ -214,7 +214,7 @@ def load_atlas(
     # reduced_faces = reduced_mesh.faces
 
     # Set up the forward model
-    set_fw_model(atlas_viewer.fw_model, vol2, atlas_viewer.binary_vol_path,
+    set_fw_model(atlas_viewer.fw_model, volume, atlas_viewer.binary_vol_path,
                  pialsurf_v, pialsurf_f, headsurf_v, headsurf_f, gm, scalp, tiss_prop)
 
     # plot_mesh(headsurf_v, headsurf_f)

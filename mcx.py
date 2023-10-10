@@ -1,27 +1,28 @@
-from temp_shared_globals import refpts
-#import pymcx.pymcx as mcxm
+
+# import pymcx.pymcx as mcxm
 import numpy as np
 from atlas import AtlasViewer
 from fw_model import Fw_model
 from probe import Probe
 import os
-#import nibabel as nib
+# import nibabel as nib
 
 import pmcx
 
 
-def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
-
+def calculate_fluence():
 
     atlas_viewer = AtlasViewer()
+    probe = atlas_viewer.probe
+    fwmodel = atlas_viewer.fw_model
 
     # Null checks
     if not fwmodel:
         raise ValueError("fwmodel cannot be None.")
     if not probe:
         raise ValueError("probe cannot be None.")
-    if not volume_file:
-        raise ValueError("volume_file cannot be provided as None.")
+    # if not volume_file:
+    #    raise ValueError("volume_file cannot be provided as None.")
 
     # Check expected attributes in fwmodel and probe
     required_fwmodel_attrs = [
@@ -81,7 +82,7 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
 
             # mua -absorption, mus - scattering, g - anisotropy, n - refraction
             result_list = [[0, 0, 1, 1]]
-            result_list.extend([[                
+            result_list.extend([[
                 tiss_prop[i]['absorption'],  # [iWav],
                 tiss_prop[i]['scattering'],  # [iWav],
                 tiss_prop[i]['anisotropy'],  # [0],
@@ -91,22 +92,22 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
             cfg = {
                 'nphoton': num_phot,
                 'vol': fwmodel.headvol.volume_t,
-                'tstart':0,
-                'tend':5e-9,
-                'tstep':5e-9,
+                'tstart': 0,
+                'tend': 5e-9,
+                'tstep': 5e-9,
                 'srcpos': [probe.reg_optpos[ii]
-                                              [0], probe.reg_optpos[ii][1], probe.reg_optpos[ii][2]],
-                'srcdir':list(
-                srcdir / np.linalg.norm(srcdir)),
-                'prop':result_list,
-                'issrcfrom0':1,
-                'isnormalized':1,
-                'outputtype':'fluence',
-                'seed':int(np.floor(np.random.rand() * 1e+7)),
-                'issaveexit':1,
-                }
-            data=pmcx.run(cfg)
-            
+                           [0], probe.reg_optpos[ii][1], probe.reg_optpos[ii][2]],
+                'srcdir': list(
+                    srcdir / np.linalg.norm(srcdir)),
+                'prop': result_list,
+                'issrcfrom0': 1,
+                'isnormalized': 1,
+                'outputtype': 'fluence',
+                'seed': int(np.floor(np.random.rand() * 1e+7)),
+                'issaveexit': 1,
+            }
+            data = pmcx.run(cfg)
+
             flue = data["flux"]
             flue_stat = data["stat"]
             print("nonzero check", np.any(flue[:, :, :, 0] != 0))
@@ -132,13 +133,6 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
                         np.ceil(yy)), int(np.ceil(zz))]
 
                 flueDet[ii, jOpt, iWav] = foo
-
-            # Project to the brain surface and scalp surface
-
-            # flueMesh[:, ii, iWav] = np.sum(np.reshape(flue[mapMesh2Vox], (nNode, maxNVoxPerNode)), axis=1)
-            # print("mapmesh",np.shape(mapMesh2Vox))
-            # print(flue.data[mapMesh2Vox.astype(int)])
-            # flueMesh[:, ii, iWav] = np.sum(np.reshape(flue.data[mapMesh2Vox.astype(int)], (nNode, maxNVoxPerNode)), axis=1)
 
             mapMesh2Vox_flat = fwmodel.get_projVolToMesh_brain().flatten().astype(int)
             reshaped_data = np.reshape(
@@ -198,3 +192,5 @@ def calculate_fluence(fwmodel: Fw_model, probe: Probe, volume_file):
 
     np.save(os.path.join(atlas_viewer.working_dir, "Adot.npy"), Adot)
     np.save(os.path.join(atlas_viewer.working_dir, "Adot_scalp.npy"), Adot_scalp)
+
+    return Adot, Adot_scalp

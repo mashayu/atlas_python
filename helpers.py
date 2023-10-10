@@ -80,7 +80,7 @@ def printProgressBar(
 def update_mask(volume, number: int):
     ones_mask = volume == 1
     updated_mask = ones_mask * number
-    new_volume = np.zeros_like(volume)
+    new_volume = np.zeros_like(volume, dtype=int)
     new_volume += updated_mask
     return new_volume
 
@@ -403,7 +403,7 @@ def save_nifti(volume, filename):
     nifti_img = nib.Nifti1Image(volume, affine=None)
 
     # Specify the output filename (e.g., "output.nii.gz")
-    output_filename = filename + ".nii"
+    output_filename = filename
 
     # Save the NIfTI image to a file
     nib.save(nifti_img, output_filename)

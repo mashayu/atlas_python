@@ -1,4 +1,4 @@
-from helpers import printProgressBar, find_region_centers, gen_bbox
+from helpers import printProgressBar, update_mask
 import trimesh
 from skimage import measure
 import numpy as np
@@ -144,29 +144,26 @@ class Fw_model:
 
     def load_masks(
             self,
-            atlas_viewer,
-            anatomy_folder=r"C:\Users\User\Documents\masha\Alex\atlas_python\icbm_seg",
-            binary_vol_t_path=None,
-            working_directory=None):
+            atlas_viewer):
         new_working_directory = atlas_viewer.working_dir
         if not os.path.exists(new_working_directory):
             os.makedirs(new_working_directory)
-        os.chdir(new_working_directory)
+        # os.chdir(new_working_directory)
 
-        img = nib.load(os.path.join(anatomy_folder, "gm.nii"))
+        img = nib.load(os.path.join(atlas_viewer.anatomy_dir, "gm.nii"))
         gm = img.get_fdata()[:]
         gm[gm != 0] = 1
 
-        img = nib.load(os.path.join(anatomy_folder, "scalp.nii"))
+        img = nib.load(os.path.join(atlas_viewer.anatomy_dir, "scalp.nii"))
         skin = img.get_fdata()[:]
         skin[skin != 0] = 1
 
         mask_paths = {
-            "scalp": os.path.join(anatomy_folder, "scalp.nii"),
-            "skull": os.path.join(anatomy_folder, "skull.nii"),
-            "csf": os.path.join(anatomy_folder, "csf.nii"),
-            "gray_matter": os.path.join(anatomy_folder, "gm.nii"),
-            "white_matter": os.path.join(anatomy_folder, "wm.nii"),
+            "scalp": os.path.join(atlas_viewer.anatomy_dir, "scalp.nii"),
+            "skull": os.path.join(atlas_viewer.anatomy_dir, "skull.nii"),
+            "csf": os.path.join(atlas_viewer.anatomy_dir, "csf.nii"),
+            "gray_matter": os.path.join(atlas_viewer.anatomy_dir, "gm.nii"),
+            "white_matter": os.path.join(atlas_viewer.anatomy_dir, "wm.nii"),
         }
 
         mask_values = {}
@@ -175,7 +172,7 @@ class Fw_model:
         for mask_name, mask_path in mask_paths.items():
             mask = nib.load(mask_path).get_fdata()[:]
             mask[mask != 0] = 1
-            updated_mask = self.update_mask(mask, mask_value)
+            updated_mask = update_mask(mask, mask_value)
             updated_masks[mask_name] = updated_mask
             mask_values[mask_name] = mask_value
             mask_value += 1
@@ -205,13 +202,12 @@ class Fw_model:
         self.mesh_scalp_orig.set_faces_and_vertices(faces, vertices)
         return vertices, faces
 
-    def projVoltoMesh_brain(self,
-                            filepath,
-                            filename="projVoltoMesh_brain.npy"):
+    def projVoltoMesh_brain(self, filepath):
+        print("projecing brain volume to gm surface...")
 
-        if os.path.exists(os.path.join(filepath, filename)):
-            self.path_projVoltoMesh_brain = os.path.join(filepath, filename)
-            return
+        if os.path.exists(filepath):
+            self.path_projVoltoMesh_brain = filepath
+            return self.get_projVolToMesh_brain()
 
         if not hasattr(self.mesh_orig, 'reduced_vertices') or not hasattr(
                 self.mesh_orig,
@@ -225,9 +221,9 @@ class Fw_model:
                        'brain_vol'):  # Check for attribute existence
             raise ValueError("headvol is missing required attributes.")
 
-        if not os.path.isdir(
-                filepath):  # Check if the filepath directory exists
-            raise ValueError(f"The directory {filepath} does not exist.")
+        # if not os.path.isdir(
+        #        filepath):  # Check if the filepath directory exists
+        #    raise ValueError(f"The directory {filepath} does not exist.")
 
         nNode = np.size(nodeX, 0)
 
@@ -237,7 +233,7 @@ class Fw_model:
 
         nC = np.size(i_headvol_flat, 0)
         Amap = np.zeros((nC, 1), dtype=np.int64)
-        mapMesh2Vox = np.ones((nNode, 4000), dtype=np.int64)
+        mapMesh2Vox = np.ones((nNode, 6000), dtype=np.int64)
         NVoxPerNode = np.zeros((nNode, 1), dtype=np.int64)
 
         # Unpack the indices along each dimension
@@ -300,15 +296,14 @@ class Fw_model:
 
         np.save(self.path_projVoltoMesh_brain, mapMesh2Vox)
 
-        return mapMesh2Vox, NVoxPerNode, Amap
+        return mapMesh2Vox  # , NVoxPerNode, Amap
 
-    def projVoltoMesh_scalp(self,
-                            filepath,
-                            filename="projVoltoMesh_scalp.npy"):
+    def projVoltoMesh_scalp(self, filepath):
+        print("projecing scalp volume to scalp surface...")
 
-        if os.path.exists(os.path.join(filepath, filename)):
-            self.path_projVoltoMesh_scalp = os.path.join(filepath, filename)
-            return
+        if os.path.exists(filepath):
+            self.path_projVoltoMesh_scalp = filepath
+            return self.get_projVolToMesh_scalp()
 
         nodeX = self.mesh_scalp_orig.reduced_vertices
         elem = self.mesh_scalp_orig.reduced_faces
@@ -327,7 +322,7 @@ class Fw_model:
         nC = np.size(i_headvol_flat, 0)
 
         Amap = np.zeros((nC, 1), dtype=np.int64)
-        mapMesh2Vox = np.ones((nNode, 4000), dtype=np.int64)
+        mapMesh2Vox = np.ones((nNode, 6000), dtype=np.int64)
         NVoxPerNode = np.zeros((nNode, 1), dtype=np.int64)
 
         # Unpack the indices along each dimension
@@ -383,10 +378,10 @@ class Fw_model:
         ciao = np.where(mapMesh2Vox == 0)
         mapMesh2Vox[ciao] = 1
 
-        self.path_projVoltoMesh_scalp = os.path.join(filepath, filename)
+        self.path_projVoltoMesh_scalp = os.path.join(filepath)
         np.save(self.path_projVoltoMesh_scalp, mapMesh2Vox)
 
-        return mapMesh2Vox, NVoxPerNode, Amap
+        return mapMesh2Vox  # , NVoxPerNode, Amap
 
     def get_projVolToMesh_brain(self):
         mapMesh2Vox = np.load(self.path_projVoltoMesh_brain)

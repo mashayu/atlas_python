@@ -40,19 +40,21 @@ def get_tiss_prop(*args):
 
     # Extract args
     if len(args) >= 1:
-        if os.path.exists(args[0]):
-            maxiter = 20
-            iter_count = 0
-            filename = args[0]
-            names = []
-            with open(filename, "rt") as fid:
-                for line in fid:
-                    iter_count += 1
-                    names.append(line.strip())
-                    if iter_count >= maxiter:
-                        break
+        if isinstance(args[0], str):
+            if os.path.exists(args[0]):
+                maxiter = 20
+                iter_count = 0
+                filename = args[0]
+                names = []
+                with open(filename, "rt") as fid:
+                    for line in fid:
+                        iter_count += 1
+                        names.append(line.strip())
+                        if iter_count >= maxiter:
+                            break
 
         else:
+            names0 = args[0]
             if not isinstance(names0, list):
                 names = []
                 iname = ([0] + [i for i, c in enumerate(names0) if c == ":"] +

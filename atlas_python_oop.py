@@ -3,13 +3,23 @@ import numpy as np
 import trimesh
 import matplotlib.pyplot as plt
 from mcx import calculate_fluence
-from temp_shared_globals import refpts
+from temp_shared_globals import refpts_icbm
 from helpers import *
 from atlas import AtlasViewer
 from load_atlas.load_atlas import load_atlas
+from load_atlas.load_tiss_prop import get_tiss_prop
 
 
 def load_probe_from_folder(atlas_viewer: AtlasViewer):
+    """
+    Load the probe configuration from the probe directory.
+
+    Args:
+        - atlas_viewer (AtlasViewer): AtlasViewer object.
+
+    Returns:
+
+    """
     probe = atlas_viewer.probe
     nirs_file = find_nirs_file(atlas_viewer.probe_dir)
     probe.load_probe_from_nirs(nirs_file)
@@ -17,14 +27,34 @@ def load_probe_from_folder(atlas_viewer: AtlasViewer):
 
 
 def load_fw_model(atlas_viewer: AtlasViewer):
+    """
+    Load the forward model from the anatomy directory.
+
+    Args:
+        - atlas_viewer (AtlasViewer): AtlasViewer object.
+
+    Returns:
+
+    """
+
     fw_model = atlas_viewer.fw_model
-    fw_model.load_masks(atlas_viewer, atlas_viewer.anatomy_dir)
+    fw_model.load_masks(atlas_viewer)
     fw_model.headvol.find_center()
     return fw_model
 
 
 def load_subject(atlas_viewer: AtlasViewer):
+    """
+    Load subject-specific anatomical data and probe configuration.
 
+    Args:
+        - atlas_viewer (AtlasViewer): AtlasViewer object.
+
+    Returns:
+        - tuple of ForwardModel and Probe objects.
+    """
+
+    print("Loading subject-specific anatomical data and probe configuration...")
     probe = load_probe_from_folder(atlas_viewer)
     fw_model = load_fw_model(atlas_viewer)
     # probe.set_optpos(optpos=optpos)
@@ -32,6 +62,16 @@ def load_subject(atlas_viewer: AtlasViewer):
 
 
 def read_digpts(digpts_file_path):
+    """
+    Read digitized points from a text file.
+
+    Args:
+        - digpts_file_path (str): Path to the digitized points text file.
+
+    Returns:
+        - tuple of dicts: digitized points reference data and optode positions.
+    """
+
     # Obtain reference digitized points from the probe
     digpts_ref = probe.read_refpoints_from_digpts(digpts_file_path)
     # Read optpoints from the digitized reference points
@@ -89,6 +129,15 @@ def extract_ordered_values(digpts_ref: dict, ref: dict):
 
 
 def register_to_digpts(atlas_viewer: AtlasViewer):
+    """
+    Register the probe's digital points to the head anatomy.
+
+    Args:
+        - atlas_viewer (AtlasViewer): AtlasViewer object.
+
+    Returns:
+
+    """
 
     print("Registering to digitized points...")
     print("It will take a while...")
@@ -119,7 +168,7 @@ def register_to_digpts(atlas_viewer: AtlasViewer):
         headvol.volume, headvol.T_2digpts)
 
     save_nifti(headvol_transf, os.path.join(
-        atlas_viewer.working_dir, "volume_t"))
+        atlas_viewer.working_dir, "volume_t.nii"))
 
     # Calculate transformation matrix from digitized points to Monte Carlo coordinates
     headvol.T_2mc = np.dot(digpts_T_2mc, headvol.T_2digpts)
@@ -174,82 +223,95 @@ def register_to_digpts(atlas_viewer: AtlasViewer):
     return
 
 
-def head_anatomy_pipeline(
-    atlas_viewer: AtlasViewer,
-    anatomy_folder=r"C:\Users\nirx\Documents\masha\atlas_python\atlas_python\icbm_seg",
-    # \2022-04-25_001.nirs",
-    probe_folder=r"C:\Users\nirx\Documents\masha\atlas_python\atlas_python\22_04_25_001"
-):
+def head_anatomy_pipeline(atlas_viewer: AtlasViewer, refpts):
+    """
+    Load subject-specific anatomical data and probe configuration.
+
+    Args:
+        - atlas_viewer (AtlasViewer): AtlasViewer object.
+
+    Returns:
+
+    """
+
     # Load subject-specific anatomical data and probe configuration
-    load_subject(atlas_viewer, anatomy_folder, probe_folder)
+    load_subject(atlas_viewer)
+
+    atlas_viewer.headvol.set_ref_pts(refpts)
+
     fw_model = atlas_viewer.fw_model
     probe = atlas_viewer.probe
 
-    anatomy_folder = atlas_viewer.anatomy_dir
-    probe_folder = atlas_viewer.probe_dir
+    # TODO: extract tiss_prop_labels automatically
+    tiss_prop_labels = ["skin", "skull", "csf", "gm", "wm"]
+    fw_model.tiss_prop = get_tiss_prop(tiss_prop_labels)
 
     # Save the head volume to a NIFTI file
-    save_nifti(fw_model.headvol.volume, "volume_1")
+    save_nifti(fw_model.headvol.volume, os.path.join(
+        atlas_viewer.working_dir, "volume_1.nii"))
 
     digpts_file = os.path.join(atlas_viewer.probe_dir, 'digpts.txt')
     _, _ = read_digpts(digpts_file)
-    # Register the probe's digital points to the head anatomy
-    register_to_digpts(atlas_viewer)
-
-    # Save the transformed volume to another NIFTI file
-    save_nifti(fw_model.headvol.volume_t, "volume_1t")
-
-    # Visualize the transformed volume as a point cloud
-    # plot_point_cloud(fw_model.headvol.volume_t)
-
-    # probe.reg_optpos[0] = [155.345811492738, 184.316432551622, 155.868323109028, -0.703023648717975, -0.476906863214703, -0.527558141972975]
-    ###########################################
-    ###### load volume##########################
-    ###########################################
-    # full_volume_path = ""
-    # full_volume = nib.load(full_volume_path).get_fdata()[:]
-    ###########################################
-    # fwmodel.set_volume(gm, skin)
 
     # Build surface models for the head and pial (brain surface)
     fw_model.build_head_surf()
     fw_model.build_pial_surf()
 
-    # fwmodel.mesh_orig.reduce_mesh(filename="brainmesh_reduced")
-    # fwmodel.mesh_scalp_orig.reduce_mesh(filename="scalpmesh_reduced")
+    # Register the probe's digital points to the head anatomy
+    register_to_digpts(atlas_viewer)
+
+    # Save the transformed volume to another NIFTI file
+    save_nifti(fw_model.headvol.volume_t, os.path.join(
+        atlas_viewer.working_dir, "volume_1.nii"))
+
+    # Visualize the transformed volume as a point cloud
+    # plot_point_cloud(fw_model.headvol.volume_t)
+
+    scalpmesh_reduced_path = os.path.join(
+        atlas_viewer.working_dir, "scalpmesh_reduced.stl")
+    brainmesh_reduced_path = os.path.join(
+        atlas_viewer.working_dir, "brainmesh_reduced.stl")
+
+    fw_model.mesh_orig.reduce_mesh(filename=brainmesh_reduced_path)
+    fw_model.mesh_scalp_orig.reduce_mesh(filename=scalpmesh_reduced_path)
 
     # Load the reduced mesh versions of the head and brain surfaces
-    reduced_scalp = trimesh.load_mesh("scalpmesh_reduced.stl")
-    reduced_brain = trimesh.load_mesh("brainmesh_reduced.stl")
-
-    # Set these reduced meshes to the forward model
-    fw_model.mesh_orig.set_reduced_mesh(reduced_brain)
-    fw_model.mesh_scalp_orig.set_reduced_mesh(reduced_scalp)
+    # scalpmesh_reduced_path = trimesh.load_mesh(os.path.join(
+    #    atlas_viewer.working_dir, "scalpmesh_reduced.stl"))
+    # brainmesh_reduced_path = trimesh.load_mesh(os.path.join(
+    #    atlas_viewer.working_dir, "brainmesh_reduced.stl"))
 
     # plot_mesh(fwmodel.mesh_scalp_orig.reduced_vertices,fwmodel.mesh_scalp_orig.reduced_faces)
     # print(gm.shape)
 
-    # fwmodel.projVoltoMesh_brain()
-    # fwmodel.projVoltoMesh_scalp()
-
     # Set paths for volume-to-mesh projections for brain and scalp
-    fw_model.path_projVoltoMesh_brain = "projVoltoMesh_brain.npy"
-    fw_model.path_projVoltoMesh_scalp = "projVoltoMesh_scalp.npy"
+    fw_model.path_projVoltoMesh_brain = os.path.join(
+        atlas_viewer.working_dir, "projVoltoMesh_brain.npy")
+    fw_model.path_projVoltoMesh_scalp = os.path.join(
+        atlas_viewer.working_dir, "projVoltoMesh_scalp.npy")
 
-    # Calculate volume-to-mesh projections
-    mapMesh2Vox = fw_model.get_projVolToMesh_brain()
-    mapMesh2Vox_scalp = fw_model.get_projVolToMesh_scalp()
-
-    # Print unique values for debugging/verification
-    # print("check values", check_unique_values(volume_file_name + ".bin", int))
+    mapMesh2Vox = fw_model.projVoltoMesh_brain(
+        fw_model.path_projVoltoMesh_brain)
+    mapMesh2Vox_scalp = fw_model.projVoltoMesh_scalp(
+        fw_model.path_projVoltoMesh_scalp)
 
     # Compute fluence based on the model and probe configuration
-    calculate_fluence(fwmodel=fw_model,
-                      probe=probe,
-                      volume_file=atlas_viewer.binary_vol_t_path)
+    Adot, Adot_scalp = calculate_fluence()
+    # print(Adot)
 
 
 def load_atlas_pipeline(atlas_viewer: AtlasViewer):
+    """
+    Load the atlas and probe configuration.
+
+
+    Args:
+        - atlas_viewer (AtlasViewer): AtlasViewer object.
+
+    Returns:
+
+    """
+
     fw_model = atlas_viewer.fw_model
     load_atlas(atlas_viewer, atlas_path=atlas_viewer.atlas_dir)
     load_probe_from_folder(atlas_viewer)
@@ -267,19 +329,17 @@ def load_atlas_pipeline(atlas_viewer: AtlasViewer):
                                           'scalpmesh_reduced.stl')
     fw_model.mesh_scalp_orig.reduce_mesh(filename=scalpmesh_reduced_path)
 
-    # plot_mesh(fw_model.mesh_orig.reduced_vertices,
-    #          fw_model.mesh_orig.reduced_faces, atlas_viewer.probe.reg_optpos[:, 0:3])
+    # Set paths for volume-to-mesh projections for brain and scalp
+    fw_model.path_projVoltoMesh_brain = os.path.join(
+        atlas_viewer.working_dir, "projVoltoMesh_brain.npy")
+    fw_model.path_projVoltoMesh_scalp = os.path.join(
+        atlas_viewer.working_dir, "projVoltoMesh_scalp.npy")
 
-    # plot_mesh(fw_model.mesh_scalp_orig.reduced_vertices,
-    #          fw_model.mesh_scalp_orig.reduced_faces,  atlas_viewer.probe.reg_optpos[:, 0:3])
+    fw_model.projVoltoMesh_brain(filepath=fw_model.path_projVoltoMesh_brain)
 
-    fw_model.projVoltoMesh_brain(filepath=atlas_viewer.working_dir)
+    fw_model.projVoltoMesh_scalp(filepath=fw_model.path_projVoltoMesh_scalp)
 
-    fw_model.projVoltoMesh_scalp(filepath=atlas_viewer.working_dir)
-
-    calculate_fluence(fwmodel=fw_model,
-                      probe=probe,
-                      volume_file=atlas_viewer.binary_vol_t_path)
+    Adot, Adot_scalp = calculate_fluence()
 
 
 if __name__ == "__main__":
@@ -287,12 +347,30 @@ if __name__ == "__main__":
     fw_model = atlas_viewer.fw_model
     probe = atlas_viewer.probe
 
-    atlas_viewer.atlas_dir = r"C:\Users\User\Documents\masha\Alex\atlas_python\atlas_python\atlas_data\Colin"
-    atlas_viewer.anatomy_dir = r"C:\Users\User\Documents\masha\Alex\atlas_python\atlas_python\atlas_data\Colin"
-    # /2022-04-25_001.nirs"
-    atlas_viewer.probe_dir = r"C:\Users\User\Documents\masha\Alex\atlas_python\icbm_seg"
-    atlas_viewer.working_dir = os.path.join(atlas_viewer.anatomy_dir, "wd")
+    base_directory = os.path.dirname(os.path.abspath(__file__))
+    print(base_directory)
 
+    # path to the atlas
+    # atlas_viewer.atlas_dir = r"C:\Users\User\Documents\masha\Alex\atlas_python\atlas_python\atlas_data\Colin"
+    atlas_viewer.atlas_dir = os.path.join(
+        base_directory, r"demo_data\atlas_data\Colin")
+
+    # path to the anatomy
+    # atlas_viewer.anatomy_dir = r"C:\Users\User\Documents\masha\Alex\atlas_python\icbm_seg"
+    atlas_viewer.anatomy_dir = os.path.join(
+        base_directory, r"demo_data\anatomy_data")
+
+    # path to the probe
+    # atlas_viewer.probe_dir = r"C:\Users\User\Documents\masha\Alex\atlas_python\icbm_seg"
+    atlas_viewer.probe_dir = os.path.join(
+        base_directory, r"demo_data\probe_data")
+
+    # atlas_pipeline
+    atlas_viewer.working_dir = os.path.join(
+        atlas_viewer.probe_dir, "wd_atlas")
     load_atlas_pipeline(atlas_viewer)
 
-    # head_anatomy_pipeline(atlas_viewer)
+    # head_anatomy_pipeline
+    atlas_viewer.working_dir = os.path.join(
+        atlas_viewer.probe_dir, "wd")
+    head_anatomy_pipeline(atlas_viewer, refpts=refpts_icbm)

@@ -2,7 +2,6 @@ import numpy as np
 import os
 from load_atlas.load_tiss_prop import get_tiss_prop
 from helpers import *
-from temp_shared_globals import refpts
 
 
 class Headvol:
@@ -21,7 +20,7 @@ class Headvol:
         self.brain_vol = None
         self.scalp_vol = None
         self.center = None
-        self.ref_pts = refpts
+        self.ref_pts = None
 
     def find_center(self):
         volsurf = self.volume
